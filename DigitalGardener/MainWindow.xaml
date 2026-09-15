@@ -1,0 +1,622 @@
+﻿<Window x:Class="DigitalGardener.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Digital Gardener" Height="780" Width="1280"
+        Background="#14141A">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ThemeWindowBg" Color="#14141A"/>
+        <SolidColorBrush x:Key="ThemePanelBg" Color="#1E1E28"/>
+        <SolidColorBrush x:Key="ThemeItemBg" Color="#282838"/>
+        <SolidColorBrush x:Key="ThemeHoverBg" Color="#323246"/>
+        <SolidColorBrush x:Key="ThemeMainText" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ThemeSubText" Color="#B4B4BE"/>
+        <SolidColorBrush x:Key="ThemeAccent" Color="#007ACC"/>
+        <SolidColorBrush x:Key="ThemeBorder" Color="#3C3C50"/>
+        <SolidColorBrush x:Key="ThemeGreen" Color="#22C55E"/>
+
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="AlternatingRowBackground" Value="{StaticResource ThemePanelBg}"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="CanUserDeleteRows" Value="False"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="SelectionMode" Value="Extended"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+        </Style>
+
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource ThemePanelBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource ThemePanelBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeHoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeAccent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="CaretBrush" Value="{StaticResource ThemeAccent}"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{StaticResource ThemeItemBg}"
+                                                BorderBrush="{StaticResource ThemeBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="20"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="1"
+                                                      Data="M 0 0 L 4 4 L 8 0 Z"
+                                                      Fill="{StaticResource ThemeMainText}"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="10,4,24,4"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              TextElement.Foreground="{StaticResource ThemeMainText}"/>
+                            <Popup Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border Background="{StaticResource ThemeItemBg}"
+                                            BorderBrush="{StaticResource ThemeAccent}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                        <ScrollViewer>
+                                            <StackPanel IsItemsHost="True"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeHoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeAccent}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Background" Value="{StaticResource ThemePanelBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeSubText}"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource ThemeBorder}"
+                                BorderThickness="1,1,1,0"
+                                CornerRadius="4,4,0,0"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{StaticResource ThemeWindowBg}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{StaticResource ThemeAccent}"/>
+                                <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+        </Style>
+
+        <DataTemplate x:Key="CheckBoxCellTemplate">
+            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"/>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource ThemeWindowBg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource ThemePanelBg}"
+                Padding="16,12" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Digital Gardener" FontSize="20" FontWeight="Bold"
+                           Foreground="{StaticResource ThemeMainText}" Margin="0,0,24,0"/>
+                <TextBlock Text="Панель управления очисткой и оптимизацией системы"
+                           Foreground="{StaticResource ThemeSubText}" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <TabControl Grid.Row="1" Background="{StaticResource ThemeItemBg}"
+                    BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0" Padding="12">
+
+            <!-- ==================== TEMP ==================== -->
+            <TabItem Header="Temp и Downloads">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Сканировать" Click="ScanTempAndDownloads_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить выбранные" Click="DeleteSelected_Click" Margin="0,0,10,0"/>
+                        <Button Content="В корзину" Click="DeleteToRecycleBin_Click" Margin="0,0,10,0"/>
+                        <Button Content="Архивировать" Click="ArchiveFile_Click" Margin="0,0,10,0"/>
+                        <Button Content="Открыть папку архива" Click="OpenArchiveFolder_Click" Margin="0,0,10,0"/>
+                        <Button Content="Выбрать все" Click="SelectAllTemp_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="TempDataGrid" ItemsSource="{Binding TempFiles}"
+                              MouseDoubleClick="TempDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="Удалить выбранные" Click="DeleteSelected_Click"/>
+                                <MenuItem Header="В корзину" Click="DeleteToRecycleBin_Click"/>
+                                <MenuItem Header="Архивировать" Click="ArchiveFile_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя файла" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Размер" Binding="{Binding SizeText}" Width="180"/>
+                            <DataGridTextColumn Header="Дата доступа" Binding="{Binding LastAccessTime, StringFormat={}{0:dd.MM.yyyy HH:mm}}" Width="140"/>
+                            <DataGridTextColumn Header="Рекомендация" Binding="{Binding Recommendation}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding TempSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== КЭШ ==================== -->
+            <TabItem Header="Кэш браузеров">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Сканировать кэш" Click="ScanBrowserCache_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить выбранные" Click="DeleteSelectedBrowser_Click" Margin="0,0,10,0"/>
+                        <Button Content="В корзину" Click="RecycleSelectedBrowser_Click" Margin="0,0,10,0"/>
+                        <Button Content="Архивировать" Click="ArchiveSelectedBrowser_Click" Margin="0,0,10,0"/>
+                        <Button Content="Открыть папку архива" Click="OpenArchiveFolder_Click" Margin="0,0,10,0"/>
+                        <Button Content="Выбрать все" Click="SelectAllBrowser_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="BrowserDataGrid" ItemsSource="{Binding BrowserCacheFiles}"
+                              MouseDoubleClick="BrowserDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="Удалить выбранные" Click="DeleteSelectedBrowser_Click"/>
+                                <MenuItem Header="В корзину" Click="RecycleSelectedBrowser_Click"/>
+                                <MenuItem Header="Архивировать" Click="ArchiveSelectedBrowser_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Браузер" Binding="{Binding Reason}" Width="140"/>
+                            <DataGridTextColumn Header="Имя файла" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Размер" Binding="{Binding SizeText}" Width="180"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding BrowserSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== НЕИСПОЛЬЗУЕМЫЕ ==================== -->
+            <TabItem Header="Неиспользуемые файлы">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="Не использовались более:" Foreground="{StaticResource ThemeMainText}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="UnusedDaysCombo" Width="120" SelectedIndex="3" Margin="0,0,10,0"
+                                  SelectionChanged="UnusedDaysCombo_SelectionChanged">
+                            <ComboBoxItem Content="30 дней"/>
+                            <ComboBoxItem Content="60 дней"/>
+                            <ComboBoxItem Content="90 дней"/>
+                            <ComboBoxItem Content="180 дней"/>
+                        </ComboBox>
+                        <Button Content="Сканировать" Click="ScanUnusedFiles_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить выбранные" Click="DeleteSelectedUnused_Click" Margin="0,0,10,0"/>
+                        <Button Content="В корзину" Click="RecycleSelectedUnused_Click" Margin="0,0,10,0"/>
+                        <Button Content="Архивировать" Click="ArchiveSelectedUnused_Click" Margin="0,0,10,0"/>
+                        <Button Content="Открыть папку архива" Click="OpenArchiveFolder_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="UnusedDataGrid" ItemsSource="{Binding UnusedFiles}"
+                              MouseDoubleClick="UnusedDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="Удалить выбранные" Click="DeleteSelectedUnused_Click"/>
+                                <MenuItem Header="В корзину" Click="RecycleSelectedUnused_Click"/>
+                                <MenuItem Header="Архивировать" Click="ArchiveSelectedUnused_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Размер" Binding="{Binding SizeText}" Width="180"/>
+                            <DataGridTextColumn Header="Дата доступа" Binding="{Binding LastAccessTime, StringFormat={}{0:dd.MM.yyyy HH:mm}}" Width="140"/>
+                            <DataGridTextColumn Header="Тип" Binding="{Binding Source}" Width="130"/>
+                            <DataGridTextColumn Header="Причина" Binding="{Binding Reason}" Width="220"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding UnusedSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== ДУБЛИКАТЫ ==================== -->
+            <TabItem Header="Поиск дубликатов">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Сканировать на дубликаты" Click="ScanDuplicates_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить дубликаты" Click="DeleteDuplicateToRecycleBin_Click" Margin="0,0,10,0"/>
+                        <Button Content="Архивировать дубликаты" Click="ArchiveDuplicate_Click" Margin="0,0,10,0"/>
+                        <Button Content="Открыть папку архива" Click="OpenArchiveFolder_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="DuplicatesDataGrid" ItemsSource="{Binding DuplicateCandidates}"
+                              MouseDoubleClick="DuplicatesDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="Удалить дубликаты" Click="DeleteDuplicateToRecycleBin_Click"/>
+                                <MenuItem Header="Архивировать дубликаты" Click="ArchiveDuplicate_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя файла" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Размер" Binding="{Binding SizeText}" Width="140"/>
+                            <DataGridTextColumn Header="Оригинал" Binding="{Binding OriginalPath}" Width="2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding DuplicatesSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== АВТОЗАГРУЗКА ==================== -->
+            <TabItem Header="Автозагрузка">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Обновить список" Click="LoadStartupItems_Click" Margin="0,0,10,0"/>
+                        <Button Content="Отключить выбранные" Click="DisableStartupItem_Click" Margin="0,0,10,0"/>
+                        <Button Content="Оптимизировать автозагрузку" Click="OptimizeStartup_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="StartupDataGrid" ItemsSource="{Binding StartupItems}">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Отключить выбранные" Click="DisableStartupItem_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding Path}" Width="2*"/>
+                            <DataGridTextColumn Header="Расположение" Binding="{Binding Location}" Width="160"/>
+                            <DataGridTextColumn Header="Состояние" Binding="{Binding StateText}" Width="110"/>
+                            <DataGridTextColumn Header="Рекомендация" Binding="{Binding Recommendation}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding StartupSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== ПРОЦЕССЫ ==================== -->
+            <TabItem Header="Мониторинг процессов">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Обновить процессы" Click="MonitorProcesses_Click" Margin="0,0,10,0"/>
+                        <Button Content="Завершить выбранные" Click="KillProcess_Click" Margin="0,0,10,0"/>
+                        <CheckBox x:Name="AutoRefreshProcessesCheck"
+                                  Content="Авто-обновление"
+                                  VerticalAlignment="Center"
+                                  Margin="10,0,8,0"
+                                  Foreground="{StaticResource ThemeMainText}"
+                                  Checked="AutoRefreshProcesses_Changed"
+                                  Unchecked="AutoRefreshProcesses_Changed"/>
+                        <ComboBox x:Name="AutoRefreshIntervalCombo" Width="80"
+                                  SelectionChanged="AutoRefreshInterval_Changed">
+                            <ComboBoxItem Content="3 сек"/>
+                            <ComboBoxItem Content="5 сек"/>
+                            <ComboBoxItem Content="10 сек"/>
+                            <ComboBoxItem Content="30 сек"/>
+                        </ComboBox>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="ProcessesDataGrid" ItemsSource="{Binding RunningProcesses}"
+                              MouseDoubleClick="ProcessesDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="Завершить выбранные" Click="KillProcess_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя процесса" Binding="{Binding ProcessName}" Width="*"/>
+                            <DataGridTextColumn Header="PID" Binding="{Binding Id}" Width="80"/>
+                            <DataGridTextColumn Header="Память" Binding="{Binding MemoryText}" Width="120"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Рекомендация" Binding="{Binding Recommendation}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding ProcessesSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== ЗАБЛОКИРОВАННЫЕ ==================== -->
+            <TabItem Header="Заблокированные файлы">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Добавить файл..." Click="AddLockedFile_Click" Margin="0,0,10,0"/>
+                        <Button Content="Добавить папку..." Click="AddLockedFolder_Click" Margin="0,0,10,0"/>
+                        <Button Content="Освободить (завершить процессы)" Click="UnlockSelected_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить в корзину" Click="DeleteLockedFile_Click"/>
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" x:Name="LockedDataGrid" ItemsSource="{Binding LockedFiles}"
+                              MouseDoubleClick="LockedDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTextColumn Header="Имя" Binding="{Binding FileName}" Width="*"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FilePath}" Width="2*"/>
+                            <DataGridTextColumn Header="Кто блокирует" Binding="{Binding LockingProcesses}" Width="2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="{Binding LockedSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}"
+                               FontWeight="SemiBold"
+                               Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ==================== СИСТЕМА ==================== -->
+            <TabItem Header="ОС и характеристики">
+                <DataGrid x:Name="SystemInfoGrid" ItemsSource="{Binding SystemInfoItems}" IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="150"/>
+                        <DataGridTextColumn Header="Параметр" Binding="{Binding Name}" Width="*"/>
+                        <DataGridTextColumn Header="Значение" Binding="{Binding Value}" Width="2*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <!-- ==================== ЖУРНАЛ ==================== -->
+            <TabItem Header="Журнал и Отчёт">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Content="Обновить журнал ошибок" Click="RefreshLog_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить отчёт" Click="ClearReport_Click" Margin="0,0,10,0"/>
+                        <Button Content="Экспорт в TXT" Click="ExportTxt_Click" Margin="0,0,10,0"/>
+                        <Button Content="Экспорт в CSV" Click="ExportCsv_Click" Margin="0,0,10,0"/>
+                        <Button Content="Открыть папку отчётов" Click="OpenReportsFolder_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить все отчёты" Click="DeleteAllReports_Click"/>
+                    </WrapPanel>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding ReportItems}"
+                             Background="{StaticResource ThemeItemBg}"
+                             Foreground="{StaticResource ThemeMainText}"
+                             BorderBrush="{StaticResource ThemeBorder}"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="[" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Category}" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
+                                    <TextBlock Text="]" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding Message}" Foreground="{StaticResource ThemeMainText}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBox Grid.Row="2" x:Name="LogTextBox" Height="130" Margin="0,12,0,0"
+                             AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True"
+                             VerticalScrollBarVisibility="Auto"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Background="{StaticResource ThemePanelBg}"
+                Padding="12" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <ItemsControl Grid.Column="0" ItemsSource="{Binding ProgressSlots}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource ThemeItemBg}"
+                                    BorderBrush="{StaticResource ThemeBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="8,4"
+                                    Margin="0,0,8,0"
+                                    MinWidth="180">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Title}"
+                                               Foreground="{StaticResource ThemeMainText}"
+                                               FontSize="11"/>
+                                    <ProgressBar Height="6" Margin="0,3,0,0"
+                                                 Minimum="0" Maximum="100"
+                                                 Value="{Binding Percent}"
+                                                 Foreground="{StaticResource ThemeGreen}"
+                                                 Background="{StaticResource ThemeWindowBg}"
+                                                 BorderThickness="0"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Grid.Column="1"
+                           Text="Digital Gardener v1.0 — Система оптимизации Windows"
+                           Foreground="{StaticResource ThemeSubText}"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
