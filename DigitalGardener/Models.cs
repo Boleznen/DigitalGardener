@@ -30,6 +30,7 @@ namespace DigitalGardener
         public string Reason { get; set; } = "";
         public string Recommendation { get; set; } = "";
         public string Source { get; set; } = "";
+        public System.Windows.Media.ImageSource? Icon { get; set; }   // 🆕
         public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
@@ -42,6 +43,7 @@ namespace DigitalGardener
         public string SizeText => $"{SizeBytes:N0} байт";
         public int GroupId { get; set; }
         public string OriginalPath { get; set; } = "";
+        public System.Windows.Media.ImageSource? Icon { get; set; }   // 🆕
         public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
@@ -111,9 +113,6 @@ namespace DigitalGardener
         public double Percent { get => _percent; set => Set(ref _percent, value); }
     }
 
-    /// <summary>
-    /// Итоговая сводка по таблице: количество + сумма размера.
-    /// </summary>
     public class CollectionSummary : ObservableObject
     {
         private int _count;
@@ -137,15 +136,39 @@ namespace DigitalGardener
         }
     }
 
-    /// <summary>
-    /// Настройки приложения, которые сохраняются в settings.json.
-    /// </summary>
+    public class ProgramItem : ObservableObject
+    {
+        private bool _isSelected;
+        public string DisplayName { get; set; } = "";
+        public string DisplayVersion { get; set; } = "";
+        public string Publisher { get; set; } = "";
+        public string InstallDate { get; set; } = "";
+        public string SizeText { get; set; } = "—";
+        public long EstimatedSize { get; set; }
+        public string UninstallString { get; set; } = "";
+        public string QuietUninstallString { get; set; } = "";
+        public string InstallLocation { get; set; } = "";
+        public string RegistryKeyPath { get; set; } = "";
+        public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
+    }
+
+    // ==================== 🆕 НАСТРОЙКИ ====================
     public class AppSettings
     {
+        // Старые
         public int UnusedDays { get; set; } = 180;
         public bool AutoRefreshProcesses { get; set; } = false;
         public int AutoRefreshIntervalSec { get; set; } = 5;
         public List<string> ScanRoots { get; set; } = new();
         public bool IsAdminWarningShown { get; set; } = false;
+        public bool ShowSystemMonitor { get; set; } = true;
+
+        // 🆕 Скрытые файлы
+        public bool ShowHiddenFiles { get; set; } = false;
+
+        // 🆕 Трей
+        public bool MinimizeToTray { get; set; } = false;   // сворачивать в трей
+        public bool CloseToTray { get; set; } = false;      // закрывать в трей
+        public bool TrayHintShown { get; set; } = false;    // подсказка про трей показана
     }
 }

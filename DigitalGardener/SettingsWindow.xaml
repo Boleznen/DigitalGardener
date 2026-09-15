@@ -1,0 +1,282 @@
+﻿<Window x:Class="DigitalGardener.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Настройки — Digital Gardener"
+        Height="560" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#14141A"
+        Icon="app.ico">
+    <Window.Resources>
+        <SolidColorBrush x:Key="ThemeWindowBg" Color="#14141A"/>
+        <SolidColorBrush x:Key="ThemePanelBg" Color="#1E1E28"/>
+        <SolidColorBrush x:Key="ThemeItemBg" Color="#282838"/>
+        <SolidColorBrush x:Key="ThemeHoverBg" Color="#323246"/>
+        <SolidColorBrush x:Key="ThemeMainText" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ThemeSubText" Color="#B4B4BE"/>
+        <SolidColorBrush x:Key="ThemeAccent" Color="#007ACC"/>
+        <SolidColorBrush x:Key="ThemeBorder" Color="#3C3C50"/>
+        <SolidColorBrush x:Key="ThemeGreen" Color="#22C55E"/>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource ThemePanelBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeHoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeAccent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="0,4"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorder}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton" Focusable="False" ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{StaticResource ThemeItemBg}"
+                                                BorderBrush="{StaticResource ThemeBorder}"
+                                                BorderThickness="1" CornerRadius="4">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="20"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z"
+                                                      Fill="{StaticResource ThemeMainText}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="10,4,24,4" VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"
+                                              TextElement.Foreground="{StaticResource ThemeMainText}"/>
+                            <Popup Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                                <Grid MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border Background="{StaticResource ThemeItemBg}"
+                                            BorderBrush="{StaticResource ThemeAccent}"
+                                            BorderThickness="1" CornerRadius="4">
+                                        <ScrollViewer>
+                                            <StackPanel IsItemsHost="True"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{StaticResource ThemeItemBg}"/>
+            <Setter Property="Foreground" Value="{StaticResource ThemeMainText}"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeHoverBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource ThemeAccent}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{StaticResource ThemeWindowBg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <Border Grid.Row="0" Background="{StaticResource ThemePanelBg}"
+                Padding="20,14" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,0,0,1">
+            <TextBlock Text="⚙️ Настройки Digital Gardener"
+                       FontSize="18" FontWeight="Bold"
+                       Foreground="{StaticResource ThemeMainText}"/>
+        </Border>
+
+        <!-- Прокрутка -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20">
+            <StackPanel>
+
+                <!-- Секция: Неиспользуемые файлы -->
+                <Border Background="{StaticResource ThemePanelBg}"
+                        BorderBrush="{StaticResource ThemeBorder}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="📁 Неиспользуемые файлы"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeAccent}"
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="Считать файл неиспользуемым, если не открывался более:"
+                                   Foreground="{StaticResource ThemeSubText}"
+                                   Margin="0,0,0,8"
+                                   TextWrapping="Wrap"/>
+                        <ComboBox x:Name="UnusedDaysComboSettings" Width="200" HorizontalAlignment="Left">
+                            <ComboBoxItem Content="30 дней"/>
+                            <ComboBoxItem Content="60 дней"/>
+                            <ComboBoxItem Content="90 дней"/>
+                            <ComboBoxItem Content="180 дней"/>
+                        </ComboBox>
+                    </StackPanel>
+                </Border>
+
+                <!-- Секция: Мониторинг процессов -->
+                <Border Background="{StaticResource ThemePanelBg}"
+                        BorderBrush="{StaticResource ThemeBorder}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="⚙️ Мониторинг процессов"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeAccent}"
+                                   Margin="0,0,0,10"/>
+                        <CheckBox x:Name="AutoRefreshProcessesCheckSettings"
+                                  Content="Автоматически обновлять список процессов"
+                                  Margin="0,0,0,8"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Интервал обновления:"
+                                       Foreground="{StaticResource ThemeSubText}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <ComboBox x:Name="AutoRefreshIntervalComboSettings" Width="120">
+                                <ComboBoxItem Content="3 сек"/>
+                                <ComboBoxItem Content="5 сек"/>
+                                <ComboBoxItem Content="10 сек"/>
+                                <ComboBoxItem Content="30 сек"/>
+                            </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Секция: Отображение -->
+                <Border Background="{StaticResource ThemePanelBg}"
+                        BorderBrush="{StaticResource ThemeBorder}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="👁️ Отображение"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeAccent}"
+                                   Margin="0,0,0,10"/>
+                        <CheckBox x:Name="ShowHiddenFilesCheck"
+                                  Content="Показывать скрытые файлы"
+                                  Margin="0,0,0,8"/>
+                        <CheckBox x:Name="ShowMonitorCheckSettings"
+                                  Content="Показывать графики CPU/RAM на вкладке «ОС и характеристики»"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Секция: Сворачивание в трей -->
+                <Border Background="{StaticResource ThemePanelBg}"
+                        BorderBrush="{StaticResource ThemeBorder}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="📌 Сворачивание в трей"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeAccent}"
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Text="Если функция включена, приложение продолжит работать в фоне, а иконка появится рядом с часами."
+                                   Foreground="{StaticResource ThemeSubText}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,10"/>
+                        <CheckBox x:Name="MinimizeToTrayCheck"
+                                  Content="Сворачивать в трей при сворачивании окна"
+                                  Margin="0,0,0,8"/>
+                        <CheckBox x:Name="CloseToTrayCheck"
+                                  Content="Закрывать в трей при нажатии на крестик (X)"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Информация -->
+                <Border Background="{StaticResource ThemePanelBg}"
+                        BorderBrush="{StaticResource ThemeBorder}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="ℹ️ Информация"
+                                   FontSize="14" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeAccent}"
+                                   Margin="0,0,0,10"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap">
+                            <Run Text="Настройки сохраняются автоматически в файл "/>
+                            <Run Text="DigitalGardener_Settings\settings.json" FontWeight="Bold"/>
+                            <Run Text=" рядом с приложением."/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Кнопки -->
+        <Border Grid.Row="2" Background="{StaticResource ThemePanelBg}"
+                Padding="16,12" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Отмена" Click="Cancel_Click" Margin="0,0,10,0" Width="100"/>
+                <Button Content="Сохранить" Click="Save_Click" Width="120"
+                        Background="{StaticResource ThemeAccent}"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -34,8 +34,10 @@ namespace DigitalGardener
                     var s = JsonSerializer.Deserialize<AppSettings>(json);
                     if (s != null)
                     {
-                        if (s.ScanRoots.Count == 0)
+                        // Миграция: если ScanRoots пустой — заполняем дефолтными
+                        if (s.ScanRoots == null || s.ScanRoots.Count == 0)
                             s.ScanRoots = GetDefaultScanRoots();
+
                         return s;
                     }
                 }
