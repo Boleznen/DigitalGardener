@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,7 +17,6 @@ using LiveChartsCore;
 using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using LiveChartsCore.Defaults;
-using Microsoft.VisualBasic.FileIO;
 using SkiaSharp;
 using SearchOption = System.IO.SearchOption;
 using MessageBox = System.Windows.MessageBox;
@@ -32,6 +32,7 @@ namespace DigitalGardener
         public ObservableCollection<SystemFileItem> BrowserCacheFiles { get; set; } = new();
         public ObservableCollection<SystemFileItem> GameCacheItems { get; set; } = new();
         public ObservableCollection<SystemFileItem> UnusedFiles { get; set; } = new();
+        public ObservableCollection<SystemFileItem> ArchiveFiles { get; set; } = new();
         public ObservableCollection<DuplicateItem> DuplicateCandidates { get; set; } = new();
         public ObservableCollection<StartupItem> StartupItems { get; set; } = new();
         public ObservableCollection<ProcessItem> RunningProcesses { get; set; } = new();
@@ -40,12 +41,14 @@ namespace DigitalGardener
         public ObservableCollection<SystemInfoItem> SystemInfoItems { get; set; } = new();
         public ObservableCollection<ProgressSlot> ProgressSlots { get; set; } = new();
         public ObservableCollection<ProgramItem> InstalledPrograms { get; set; } = new();
+        public ObservableCollection<DriveChoiceItem> Drives { get; set; } = new();
 
         // ==================== СВОДКИ ====================
         public CollectionSummary TempSummary { get; set; } = new();
         public CollectionSummary BrowserSummary { get; set; } = new();
         public CollectionSummary GameCacheSummary { get; set; } = new();
         public CollectionSummary UnusedSummary { get; set; } = new();
+        public CollectionSummary ArchiveSummary { get; set; } = new();
         public CollectionSummary DuplicatesSummary { get; set; } = new();
         public CollectionSummary StartupSummary { get; set; } = new();
         public CollectionSummary ProcessesSummary { get; set; } = new();
@@ -72,17 +75,21 @@ namespace DigitalGardener
         private bool _initializing = true;
         private bool _realClose = false;
 
+        private CancellationTokenSource? _duplicateCts;
+
+        public string SelectedDrive { get; private set; } = "C:";
+
         // ==================== КОНСТРУКТОР ====================
         public MainWindow()
         {
             InitializeComponent();
             DataContext = this;
 
-            // Хуки сводок
             HookSummary(TempFiles, TempSummary);
             HookSummary(BrowserCacheFiles, BrowserSummary);
             HookSummary(GameCacheItems, GameCacheSummary);
             HookSummary(UnusedFiles, UnusedSummary);
+            HookSummary(ArchiveFiles, ArchiveSummary);
             HookSummary(DuplicateCandidates, DuplicatesSummary);
             HookSummary(StartupItems, StartupSummary);
             HookSummary(RunningProcesses, ProcessesSummary);
@@ -90,7 +97,6 @@ namespace DigitalGardener
 
             InitCharts();
 
-            // Трей
             _trayManager.Initialize(this);
             _trayManager.OnShowRequested += () => Dispatcher.Invoke(() =>
             {
@@ -104,38 +110,193 @@ namespace DigitalGardener
                 Close();
             });
 
-            // Проверка админа
             if (!ProcessManager.IsElevated())
             {
                 AdminWarningPanel.Visibility = Visibility.Visible;
-                AddReport("Внимание", "Приложение запущено без прав администратора. " +
-                    "Некоторые функции могут быть недоступны.");
+                AddReport("Внимание", "Приложение запущено без прав администратора.");
             }
 
-            // Загружаем настройки
             ApplySettingsToUi();
-
             LoadStartupItems();
             LoadSystemInfo();
+            LoadDrives();
 
-            // Обновление свободного места на диске
-            UpdateDiskSpaceText();
+            // При старте показываем пустой журнал текущей сессии
+            LogTextBox.Text =
+                "=== Журнал ошибок текущей сессии ===" + Environment.NewLine +
+                $"Файл: {LoggerService.GetCurrentLogFileName()}" + Environment.NewLine +
+                "Новые ошибки появляются здесь автоматически." + Environment.NewLine +
+                "Кнопка «Обновить журнал ошибок» — загрузить текущий файл целиком." + Environment.NewLine +
+                "Кнопка «Открыть папку логов» — посмотреть логи прошлых сессий." + Environment.NewLine +
+                new string('-', 50) + Environment.NewLine;
+
+            // Подписка на новые ошибки — пишем в UI в реальном времени
+            LoggerService.OnErrorLogged += OnErrorLoggedFromService;
+
             _diskSpaceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
-            _diskSpaceTimer.Tick += (_, __) => UpdateDiskSpaceText();
+            _diskSpaceTimer.Tick += (_, __) => RefreshDrivesDisplay();
             _diskSpaceTimer.Start();
 
-            // Прогрев CPU counter
             SystemMonitor.GetCpuUsage();
 
-            // Мониторинг CPU/RAM
             _monitorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _monitorTimer.Tick += MonitorTimer_Tick;
             _monitorTimer.Start();
 
-            // Горячие клавиши
             PreviewKeyDown += MainWindow_PreviewKeyDown;
 
             _initializing = false;
+        }
+
+        // ==================== ЛОГ ОШИБОК ====================
+        private void OnErrorLoggedFromService(string entry)
+        {
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    if (LogTextBox == null) return;
+                    LogTextBox.AppendText(entry);
+                    LogTextBox.ScrollToEnd();
+                });
+            }
+            catch { }
+        }
+
+        // ==================== ДИСКИ ====================
+        private void LoadDrives()
+        {
+            try
+            {
+                Drives.Clear();
+
+                foreach (var drive in DriveInfo.GetDrives())
+                {
+                    try
+                    {
+                        if (drive.DriveType != DriveType.Fixed) continue;
+                        if (!drive.IsReady) continue;
+
+                        long total = drive.TotalSize;
+                        long free = drive.TotalFreeSpace;
+                        string name = drive.Name.TrimEnd('\\');
+
+                        var item = new DriveChoiceItem
+                        {
+                            Name = name,
+                            FreeBytes = free,
+                            TotalBytes = total,
+                            FullLabel = $"{name} — свободно {CollectionSummary.FormatSize(free)} из {CollectionSummary.FormatSize(total)}"
+                        };
+                        Drives.Add(item);
+                    }
+                    catch { }
+                }
+
+                DriveCombo.ItemsSource = Drives;
+
+                var saved = SettingsService.Current.SelectedDrive;
+                var match = Drives.FirstOrDefault(d => d.Name == saved);
+                if (match != null)
+                {
+                    DriveCombo.SelectedItem = match;
+                    SelectedDrive = match.Name;
+                }
+                else if (Drives.Count > 0)
+                {
+                    DriveCombo.SelectedItem = Drives[0];
+                    SelectedDrive = Drives[0].Name;
+                }
+            }
+            catch (Exception ex)
+            {
+                LoggerService.LogError("Ошибка загрузки дисков", nameof(LoadDrives), ex);
+            }
+        }
+
+        private void RefreshDrivesDisplay()
+        {
+            try
+            {
+                var current = DriveCombo.SelectedItem as DriveChoiceItem;
+                if (current == null) return;
+
+                var drive = new DriveInfo(current.Name);
+                if (!drive.IsReady) return;
+
+                current.FreeBytes = drive.TotalFreeSpace;
+                current.TotalBytes = drive.TotalSize;
+                current.FullLabel = $"{current.Name} — свободно {CollectionSummary.FormatSize(current.FreeBytes)} из {CollectionSummary.FormatSize(current.TotalBytes)}";
+
+                int idx = DriveCombo.SelectedIndex;
+                DriveCombo.ItemsSource = null;
+                DriveCombo.ItemsSource = Drives;
+                DriveCombo.SelectedIndex = idx;
+            }
+            catch { }
+        }
+
+        private void DriveCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_initializing) return;
+            if (DriveCombo?.SelectedItem is DriveChoiceItem item)
+            {
+                if (item.Name == SelectedDrive) return;
+
+                SelectedDrive = item.Name;
+                SettingsService.Current.SelectedDrive = item.Name;
+                SettingsService.SaveCurrent();
+                AddReport("Диск", $"Выбран диск: {item.Name}");
+            }
+        }
+
+        private string GetSelectedDriveRoot()
+        {
+            string drive = SelectedDrive?.TrimEnd('\\') ?? "C:";
+            return drive + "\\";
+        }
+
+        // ==================== ОВЕРЛЕЙ ====================
+        private void ShowBusy(string title, string subtitle = "Не закрывайте программу")
+        {
+            Dispatcher.Invoke(() =>
+            {
+                BusyTitle.Text = title;
+                BusySubtitle.Text = subtitle;
+                BusyProgressBar.Value = 0;
+                BusyCounter.Text = "";
+                BusyOverlay.Visibility = Visibility.Visible;
+                System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            });
+        }
+
+        private void UpdateBusy(int current, int total, string? extra = null)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (total > 0)
+                    BusyProgressBar.Value = current * 100.0 / total;
+
+                string text = extra ?? $"{current} / {total}";
+                BusyCounter.Text = ShortenPath(text);
+            });
+        }
+
+        private static string ShortenPath(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            if (text.Length <= 70) return text;
+            int half = 30;
+            return text.Substring(0, half) + "..." + text.Substring(text.Length - half);
+        }
+
+        private void HideBusy()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                BusyOverlay.Visibility = Visibility.Collapsed;
+                System.Windows.Input.Mouse.OverrideCursor = null;
+            });
         }
 
         // ==================== ХУКИ СВОДОК ====================
@@ -223,18 +384,7 @@ namespace DigitalGardener
             SettingsService.SaveCurrent();
 
             if (show) { _monitorTimer?.Start(); AddReport("Мониторинг", "Графики включены."); }
-            else { _monitorTimer?.Stop(); AddReport("Мониторинг", "Графики отключены (экономим ресурсы)."); }
-        }
-
-        // ==================== СВОБОДНОЕ МЕСТО ====================
-        private void UpdateDiskSpaceText()
-        {
-            try
-            {
-                var text = DiskSpaceHelper.GetSummaryText("C:");
-                if (DiskSpaceText != null) DiskSpaceText.Text = text;
-            }
-            catch { }
+            else { _monitorTimer?.Stop(); AddReport("Мониторинг", "Графики отключены."); }
         }
 
         // ==================== НАСТРОЙКИ ====================
@@ -244,6 +394,12 @@ namespace DigitalGardener
 
             int idx = s.UnusedDays switch { 30 => 0, 60 => 1, 90 => 2, _ => 3 };
             if (UnusedDaysCombo != null) UnusedDaysCombo.SelectedIndex = idx;
+
+            int archIdx = s.ArchiveDays switch { 30 => 0, 60 => 1, 90 => 2, _ => 3 };
+            if (ArchiveDaysCombo != null) ArchiveDaysCombo.SelectedIndex = archIdx;
+
+            int dupIdx = s.DuplicateScanScope switch { "WholeDrive" => 1, _ => 0 };
+            if (DuplicateScopeCombo != null) DuplicateScopeCombo.SelectedIndex = dupIdx;
 
             if (AutoRefreshProcessesCheck != null)
                 AutoRefreshProcessesCheck.IsChecked = s.AutoRefreshProcesses;
@@ -265,6 +421,27 @@ namespace DigitalGardener
                 SettingsService.Current.UnusedDays = days;
                 SettingsService.SaveCurrent();
             }
+        }
+
+        private void ArchiveDaysCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_initializing) return;
+            if (ArchiveDaysCombo?.SelectedItem is ComboBoxItem item &&
+                int.TryParse(item.Content?.ToString()?.Split(' ')[0], out int days))
+            {
+                SettingsService.Current.ArchiveDays = days;
+                SettingsService.SaveCurrent();
+            }
+        }
+
+        private void DuplicateScopeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_initializing) return;
+            if (DuplicateScopeCombo?.SelectedIndex == 1)
+                SettingsService.Current.DuplicateScanScope = "WholeDrive";
+            else
+                SettingsService.Current.DuplicateScanScope = "UserFolders";
+            SettingsService.SaveCurrent();
         }
 
         private void AutoRefreshProcesses_Changed(object sender, RoutedEventArgs e)
@@ -347,12 +524,9 @@ namespace DigitalGardener
             await RunWithProgress("Temp", async () =>
             {
                 AddReport("Очистка", "Сканирование Temp...");
-
                 var savedSel = TableViewHelper.SaveSelection(TempFiles, "FullPath");
-
                 var list = await Task.Run(() => TempCleaner.Scan());
 
-                // 🆕 Заполняем иконки
                 foreach (var f in list)
                     f.Icon = FileIconHelper.GetIconForExtension(Path.GetExtension(f.FullPath));
 
@@ -361,9 +535,15 @@ namespace DigitalGardener
 
                 TableViewHelper.RestoreSelection(TempFiles, savedSel, "FullPath");
                 UpdateExtCombo(TempExtCombo, TempFiles);
-
                 AddReport("Очистка", $"Найдено {list.Count} файлов.");
             });
+        }
+
+        private void ClearTempList_Click(object sender, RoutedEventArgs e)
+        {
+            TempFiles.Clear();
+            UpdateExtCombo(TempExtCombo, TempFiles);
+            AddReport("Очистка", "Список Temp очищен.");
         }
 
         private void DeleteSelected_Click(object sender, RoutedEventArgs e) =>
@@ -401,9 +581,7 @@ namespace DigitalGardener
             await RunWithProgress("Кэш", async () =>
             {
                 AddReport("Кэш браузеров", "Сканирование...");
-
                 var savedSel = TableViewHelper.SaveSelection(BrowserCacheFiles, "FullPath");
-
                 var list = await Task.Run(() => BrowserCacheCleaner.Scan());
 
                 foreach (var f in list)
@@ -414,9 +592,15 @@ namespace DigitalGardener
 
                 TableViewHelper.RestoreSelection(BrowserCacheFiles, savedSel, "FullPath");
                 UpdateExtCombo(BrowserExtCombo, BrowserCacheFiles);
-
                 AddReport("Кэш браузеров", $"Найдено {list.Count} файлов.");
             });
+        }
+
+        private void ClearBrowserList_Click(object sender, RoutedEventArgs e)
+        {
+            BrowserCacheFiles.Clear();
+            UpdateExtCombo(BrowserExtCombo, BrowserCacheFiles);
+            AddReport("Кэш браузеров", "Список очищен.");
         }
 
         private void DeleteSelectedBrowser_Click(object sender, RoutedEventArgs e) =>
@@ -460,6 +644,12 @@ namespace DigitalGardener
                 AddReport("Игровой кэш", $"Найдено: {list.Count}, " +
                     $"{CollectionSummary.FormatSize(list.Sum(x => x.SizeBytes))}");
             });
+        }
+
+        private void ClearGameList_Click(object sender, RoutedEventArgs e)
+        {
+            GameCacheItems.Clear();
+            AddReport("Игровой кэш", "Список очищен.");
         }
 
         private async void CleanSelectedGameCache_Click(object sender, RoutedEventArgs e)
@@ -517,18 +707,20 @@ namespace DigitalGardener
                 GameSearchBox.Text, "");
 
         private void ExportGameCsv_Click(object sender, RoutedEventArgs e) =>
-            ExportTableCsv(GameCacheItems, "game_cache");        // ==================== UNUSED ====================
+            ExportTableCsv(GameCacheItems, "game_cache");
+
+        // ==================== UNUSED ====================
         private async void ScanUnusedFiles_Click(object sender, RoutedEventArgs e)
         {
             int days = SettingsService.Current.UnusedDays;
+            string driveRoot = GetSelectedDriveRoot();
 
             await RunWithProgress($"Старые ({days}д)", async () =>
             {
-                AddReport("Неиспользуемые", $"Сканирование (>{days} дней)...");
-
+                AddReport("Неиспользуемые", $"Сканирование диска {SelectedDrive} (>{days} дней)...");
                 var savedSel = TableViewHelper.SaveSelection(UnusedFiles, "FullPath");
 
-                var roots = SettingsService.Current.ScanRoots;
+                var roots = new List<string> { driveRoot };
                 var list = await Task.Run(() => UnusedFileFinder.Scan(roots, days));
 
                 foreach (var f in list)
@@ -543,9 +735,15 @@ namespace DigitalGardener
 
                 TableViewHelper.RestoreSelection(UnusedFiles, savedSel, "FullPath");
                 UpdateExtCombo(UnusedExtCombo, UnusedFiles);
-
                 AddReport("Неиспользуемые", $"Найдено {list.Count} (>{days} дней).");
             });
+        }
+
+        private void ClearUnusedList_Click(object sender, RoutedEventArgs e)
+        {
+            UnusedFiles.Clear();
+            UpdateExtCombo(UnusedExtCombo, UnusedFiles);
+            AddReport("Неиспользуемые", "Список очищен.");
         }
 
         private void DeleteSelectedUnused_Click(object sender, RoutedEventArgs e) =>
@@ -571,27 +769,149 @@ namespace DigitalGardener
         private void ExportUnusedCsv_Click(object sender, RoutedEventArgs e) =>
             ExportTableCsv(UnusedFiles, "unused");
 
+        // ==================== ARCHIVES ====================
+        private async void ScanArchives_Click(object sender, RoutedEventArgs e)
+        {
+            int days = SettingsService.Current.ArchiveDays;
+            string driveRoot = GetSelectedDriveRoot();
+
+            await RunWithProgress($"Архивы ({days}д)", async () =>
+            {
+                AddReport("Архивы", $"Сканирование диска {SelectedDrive} (>{days} дней)...");
+
+                var roots = new List<string> { driveRoot };
+                var list = await Task.Run(() => ArchiveFinder.Scan(roots, days, 0));
+
+                foreach (var f in list)
+                    f.Icon = FileIconHelper.GetIconForExtension(Path.GetExtension(f.FullPath));
+
+                ArchiveFiles.Clear();
+                foreach (var f in list) ArchiveFiles.Add(f);
+
+                UpdateExtCombo(ArchiveExtCombo, ArchiveFiles);
+                AddReport("Архивы", $"Найдено: {list.Count}, " +
+                    $"{CollectionSummary.FormatSize(list.Sum(x => x.SizeBytes))}");
+            });
+        }
+
+        private void ClearArchiveList_Click(object sender, RoutedEventArgs e)
+        {
+            ArchiveFiles.Clear();
+            UpdateExtCombo(ArchiveExtCombo, ArchiveFiles);
+            AddReport("Архивы", "Список очищен.");
+        }
+
+        private void ArchiveDeleteSelected_Click(object sender, RoutedEventArgs e) =>
+            DeleteItems(ArchiveFiles.Cast<object>().ToList(), toRecycle: true);
+
+        private void ArchiveSelected_Click(object sender, RoutedEventArgs e) =>
+            ArchiveItems(ArchiveFiles.Cast<object>().ToList());
+
+        private void ArchiveSearch_TextChanged(object sender, TextChangedEventArgs e) =>
+            TableViewHelper.ApplyFilter(CollectionViewSource.GetDefaultView(ArchiveFiles),
+                ArchiveSearchBox.Text, ArchiveExtCombo.SelectedItem?.ToString() ?? "");
+
+        private void ArchiveExt_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+            TableViewHelper.ApplyFilter(CollectionViewSource.GetDefaultView(ArchiveFiles),
+                ArchiveSearchBox.Text, ArchiveExtCombo.SelectedItem?.ToString() ?? "");
+
+        private void SelectAllArchives_Click(object sender, RoutedEventArgs e)
+        {
+            bool all = ArchiveFiles.All(x => x.IsSelected);
+            foreach (var f in ArchiveFiles) f.IsSelected = !all;
+        }
+
+        private void ArchiveDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) =>
+            OpenSelectedInExplorer(ArchiveDataGrid);
+
+        private void ExportArchiveCsv_Click(object sender, RoutedEventArgs e) =>
+            ExportTableCsv(ArchiveFiles, "archives");
+
         // ==================== DUPLICATES ====================
         private async void ScanDuplicates_Click(object sender, RoutedEventArgs e)
         {
-            await RunWithProgress("Дубликаты", async () =>
+            _duplicateCts = new CancellationTokenSource();
+
+            var slot = CreateSlot("Дубликаты");
+            slot.Percent = 0;
+
+            ShowBusy("Поиск дубликатов...", "Не закрывайте программу");
+            BusyCancelButton.Visibility = Visibility.Visible;
+
+            try
             {
-                AddReport("Дубликаты", "Сканирование...");
-                var roots = new List<string>
+                var roots = new List<string>();
+
+                if (SettingsService.Current.DuplicateScanScope == "WholeDrive")
                 {
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                    Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
-                };
-                var dups = await DuplicateFinder.FindDuplicatesAsync(roots);
+                    roots.Add(GetSelectedDriveRoot());
+                    AddReport("Дубликаты", $"Сканирование всего диска {SelectedDrive}...");
+                }
+                else
+                {
+                    roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+                    roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+                    roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos));
+                    roots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
+                    roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+                    AddReport("Дубликаты", "Сканирование папок пользователя...");
+                }
+
+                var progress = new Progress<int>(p =>
+                {
+                    slot.Percent = p;
+                    BusyProgressBar.Value = p;
+                    BusyCounter.Text = $"Обработано: {p}%";
+                });
+
+                var dups = await DuplicateFinder.FindDuplicatesAsync(
+                    roots, progress, _duplicateCts.Token);
 
                 foreach (var d in dups)
                     d.Icon = FileIconHelper.GetIconForExtension(Path.GetExtension(d.FullPath));
 
                 DuplicateCandidates.Clear();
                 foreach (var d in dups) DuplicateCandidates.Add(d);
+
                 AddReport("Дубликаты", $"Найдено {dups.Count} дубликатов.");
-            });
+            }
+            catch (OperationCanceledException)
+            {
+                AddReport("Дубликаты", "Сканирование отменено пользователем.");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Дубликаты", $"Ошибка: {ex.Message}");
+                LoggerService.LogError("Ошибка поиска дубликатов", nameof(ScanDuplicates_Click), ex);
+            }
+            finally
+            {
+                HideBusy();
+                BusyCancelButton.Visibility = Visibility.Collapsed;
+                BusyCancelButton.IsEnabled = true;
+                slot.Percent = 100;
+                await Task.Delay(1500);
+                ProgressSlots.Remove(slot);
+                _duplicateCts?.Dispose();
+                _duplicateCts = null;
+            }
+        }
+
+        private void BusyCancel_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _duplicateCts?.Cancel();
+                BusyCancelButton.IsEnabled = false;
+                AddReport("Дубликаты", "Запрошена отмена...");
+            }
+            catch { }
+        }
+
+        private void ClearDupList_Click(object sender, RoutedEventArgs e)
+        {
+            DuplicateCandidates.Clear();
+            AddReport("Дубликаты", "Список очищен.");
         }
 
         private void DeleteDuplicateToRecycleBin_Click(object sender, RoutedEventArgs e)
@@ -603,39 +923,19 @@ namespace DigitalGardener
             {
                 try
                 {
-                    FileSystem.DeleteFile(d.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(d.FullPath,
+                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
                     DuplicateCandidates.Remove(d);
                     ok++;
                 }
                 catch (Exception ex)
                 {
-                    LoggerService.LogError("Ошибка удаления дубликата", nameof(DeleteDuplicateToRecycleBin_Click), ex);
+                    LoggerService.LogError("Ошибка удаления дубликата",
+                        nameof(DeleteDuplicateToRecycleBin_Click), ex);
                 }
             }
             AddReport("Дубликаты", $"В корзину: {ok}/{selected.Count}");
-        }
-
-        private void ArchiveDuplicate_Click(object sender, RoutedEventArgs e)
-        {
-            var selected = DuplicateCandidates.Where(x => x.IsSelected).ToList();
-            if (selected.Count == 0) { AddReport("Дубликаты", "Ничего не выбрано."); return; }
-            int ok = 0;
-            string archiveDir = GetArchiveDir();
-            foreach (var d in selected)
-            {
-                try
-                {
-                    string dest = MakeUniquePath(archiveDir, d.Name);
-                    File.Move(d.FullPath, dest);
-                    DuplicateCandidates.Remove(d);
-                    ok++;
-                }
-                catch (Exception ex)
-                {
-                    LoggerService.LogError("Ошибка архивации", nameof(ArchiveDuplicate_Click), ex);
-                }
-            }
-            AddReport("Дубликаты", $"В архив: {ok}/{selected.Count}");
         }
 
         private void DuplicatesDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) =>
@@ -650,6 +950,12 @@ namespace DigitalGardener
 
         // ==================== STARTUP ====================
         private void LoadStartupItems_Click(object sender, RoutedEventArgs e) => LoadStartupItems();
+
+        private void ClearStartupList_Click(object sender, RoutedEventArgs e)
+        {
+            StartupItems.Clear();
+            AddReport("Автозагрузка", "Список очищен.");
+        }
 
         private void LoadStartupItems()
         {
@@ -713,6 +1019,12 @@ namespace DigitalGardener
             });
         }
 
+        private void ClearProcessList_Click(object sender, RoutedEventArgs e)
+        {
+            RunningProcesses.Clear();
+            AddReport("Процессы", "Список очищен.");
+        }
+
         private void KillProcess_Click(object sender, RoutedEventArgs e)
         {
             var selected = RunningProcesses.Where(x => x.IsSelected).ToList();
@@ -770,6 +1082,13 @@ namespace DigitalGardener
             });
         }
 
+        private void ClearProgramList_Click(object sender, RoutedEventArgs e)
+        {
+            InstalledPrograms.Clear();
+            if (ProgramsCountText != null) ProgramsCountText.Text = "0";
+            AddReport("Удаление программ", "Список очищен.");
+        }
+
         private void UninstallPrograms_Click(object sender, RoutedEventArgs e)
         {
             var selected = InstalledPrograms.Where(x => x.IsSelected).ToList();
@@ -798,11 +1117,7 @@ namespace DigitalGardener
                 var (success, message) = ProgramUninstaller.RunUninstallerWithMessage(inst);
                 AddReport("Удаление программ", message);
 
-                if (success)
-                {
-                    ok++;
-                    System.Threading.Thread.Sleep(1500);
-                }
+                if (success) { ok++; System.Threading.Thread.Sleep(1500); }
                 else failed++;
             }
 
@@ -816,104 +1131,13 @@ namespace DigitalGardener
         private void ExportProgramsCsv_Click(object sender, RoutedEventArgs e) =>
             ExportTableCsv(InstalledPrograms, "programs");
 
-        // ==================== REPORT ====================
-        private void RefreshLog_Click(object sender, RoutedEventArgs e)
-        {
-            LogTextBox.Text = LoggerService.GetLogContents();
-            AddReport("Журнал", "Журнал обновлён.");
-        }
-
-        private void ClearReport_Click(object sender, RoutedEventArgs e)
-        {
-            ReportItems.Clear();
-            LogTextBox.Text = string.Empty;
-            AddReport("Журнал", "Отчёт очищен.");
-        }
-
-        private void ExportTxt_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (ReportItems.Count == 0) { AddReport("Экспорт", "Отчёт пуст."); return; }
-                string path = ReportExporter.ExportToTxt(ReportItems);
-                AddReport("Экспорт", $"Сохранено в TXT: {Path.GetFileName(path)}");
-            }
-            catch (Exception ex) { AddReport("Экспорт", $"Ошибка: {ex.Message}"); }
-        }
-
-        private void ExportCsv_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (ReportItems.Count == 0) { AddReport("Экспорт", "Отчёт пуст."); return; }
-                string path = ReportExporter.ExportToCsv(ReportItems);
-                AddReport("Экспорт", $"Сохранено в CSV: {Path.GetFileName(path)}");
-            }
-            catch (Exception ex) { AddReport("Экспорт", $"Ошибка: {ex.Message}"); }
-        }
-
-        private void OpenReportsFolder_Click(object sender, RoutedEventArgs e)
-        {
-            ReportExporter.OpenReportsFolder();
-            AddReport("Экспорт", "Открыта папка с отчётами.");
-        }
-
-        private void DeleteAllReports_Click(object sender, RoutedEventArgs e)
-        {
-            var (deleted, freed) = ReportExporter.DeleteAllReports();
-            AddReport("Экспорт", $"Удалено файлов: {deleted}. Освобождено: {CollectionSummary.FormatSize(freed)}");
-        }
-
-        // ==================== UPDATE CHECK ====================
-        private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
-        {
-            AddReport("Обновление", "Проверка обновлений...");
-            var info = await UpdateChecker.CheckAsync();
-
-            if (string.IsNullOrEmpty(info.LatestVersion))
-            {
-                AddReport("Обновление", "Не удалось проверить (нет интернета?)");
-                MessageBox.Show("Не удалось проверить обновления.\nПроверьте интернет.",
-                    "Обновление", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!info.HasUpdate)
-            {
-                AddReport("Обновление", $"У вас последняя версия {UpdateChecker.CurrentVersion}.");
-                MessageBox.Show($"У вас уже последняя версия v{UpdateChecker.CurrentVersion}.",
-                    "Обновление", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            AddReport("Обновление", $"Доступна версия: v{info.LatestVersion}");
-
-            var result = MessageBox.Show(
-                $"🎉 Доступна новая версия v{info.LatestVersion}!\n\n" +
-                $"Текущая: v{UpdateChecker.CurrentVersion}\n\n" +
-                "Открыть страницу загрузки на GitHub?",
-                "Доступно обновление",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (result == MessageBoxResult.Yes)
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = string.IsNullOrEmpty(info.HtmlUrl)
-                            ? "https://github.com/Boleznen/DigitalGardener/releases"
-                            : info.HtmlUrl,
-                        UseShellExecute = true
-                    });
-                    AddReport("Обновление", "Открыта страница релиза.");
-                }
-                catch (Exception ex) { AddReport("Обновление", $"Ошибка: {ex.Message}"); }
-            }
-        }
-
         // ==================== LOCKED FILES ====================
+        private void ClearLockedList_Click(object sender, RoutedEventArgs e)
+        {
+            LockedFiles.Clear();
+            AddReport("Заблокированные", "Список очищен.");
+        }
+
         private void AddLockedFile_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new Microsoft.Win32.OpenFileDialog();
@@ -927,7 +1151,6 @@ namespace DigitalGardener
 
         private void AddLockedFolder_Click(object sender, RoutedEventArgs e)
         {
-            // 🆕 Используем WPF-нативный OpenFolderDialog (надёжнее WinForms)
             var dlg = new Microsoft.Win32.OpenFolderDialog
             {
                 Title = "Выберите папку для анализа блокировок",
@@ -937,37 +1160,26 @@ namespace DigitalGardener
             if (dlg.ShowDialog() == true)
             {
                 string folder = dlg.FolderName;
-                int added = 0;
-                int errors = 0;
+                int added = 0, errors = 0;
 
                 try
                 {
-                    // Ищем файлы во ВСЕХ подпапках, а не только в корне
                     foreach (var f in Directory.EnumerateFiles(folder, "*",
                         System.IO.SearchOption.AllDirectories))
                     {
                         try
                         {
                             foreach (var it in FileUnlocker.BuildLockedItem(f))
-                            {
-                                LockedFiles.Add(it);
-                                added++;
-                            }
+                            { LockedFiles.Add(it); added++; }
                         }
                         catch { errors++; }
                     }
 
-                    if (added == 0)
-                    {
-                        AddReport("Заблокированные",
-                            $"⚠️ В папке {folder} не найдено файлов для анализа.");
-                    }
-                    else
-                    {
-                        AddReport("Заблокированные",
-                            $"Из папки {folder} добавлено файлов: {added}" +
-                            (errors > 0 ? $", ошибок: {errors}" : ""));
-                    }
+                    AddReport("Заблокированные",
+                        added == 0
+                            ? $"⚠️ В папке {folder} не найдено файлов."
+                            : $"Из папки {folder} добавлено: {added}" +
+                              (errors > 0 ? $", ошибок: {errors}" : ""));
                 }
                 catch (Exception ex)
                 {
@@ -980,7 +1192,9 @@ namespace DigitalGardener
 
         private void UnlockSelected_Click(object sender, RoutedEventArgs e)
         {
+            var toRemove = new List<LockedFileItem>();
             int ok = 0;
+
             foreach (var lf in LockedFiles.Where(x => x.IsSelected).ToList())
             {
                 try
@@ -997,12 +1211,42 @@ namespace DigitalGardener
                         }
                     }
                     AddReport("Заблокированные", $"Освобождён: {lf.FileName}");
+
+                    var answer = MessageBox.Show(
+                        $"Файл «{lf.FileName}» освобождён.\n\nУдалить его в корзину?",
+                        "Удалить файл?",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+
+                    if (answer == MessageBoxResult.Yes)
+                    {
+                        try
+                        {
+                            if (Directory.Exists(lf.FilePath))
+                                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(lf.FilePath,
+                                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                            else if (File.Exists(lf.FilePath))
+                                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(lf.FilePath,
+                                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+
+                            toRemove.Add(lf);
+                            AddReport("Заблокированные", $"Удалён в корзину: {lf.FileName}");
+                        }
+                        catch (Exception ex)
+                        {
+                            AddReport("Заблокированные", $"Не удалось удалить {lf.FileName}: {ex.Message}");
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
                     LoggerService.LogError("Ошибка освобождения", nameof(UnlockSelected_Click), ex);
                 }
             }
+
+            foreach (var lf in toRemove) LockedFiles.Remove(lf);
             AddReport("Заблокированные", $"Завершено процессов: {ok}");
         }
 
@@ -1012,7 +1256,9 @@ namespace DigitalGardener
             {
                 try
                 {
-                    FileSystem.DeleteFile(lf.FilePath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(lf.FilePath,
+                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
                     LockedFiles.Remove(lf);
                     AddReport("Заблокированные", $"Удалён: {lf.FileName}");
                 }
@@ -1022,17 +1268,10 @@ namespace DigitalGardener
 
         private void SelectAllLocked_Click(object sender, RoutedEventArgs e)
         {
-            if (LockedFiles.Count == 0)
-            {
-                AddReport("Заблокированные", "Список пуст.");
-                return;
-            }
-
+            if (LockedFiles.Count == 0) { AddReport("Заблокированные", "Список пуст."); return; }
             bool all = LockedFiles.All(x => x.IsSelected);
             foreach (var f in LockedFiles) f.IsSelected = !all;
-
-            AddReport("Заблокированные",
-                all ? "Выделение снято." : $"Выбрано всё: {LockedFiles.Count} файлов.");
+            AddReport("Заблокированные", all ? "Выделение снято." : $"Выбрано: {LockedFiles.Count}");
         }
 
         private void LockedDataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e) =>
@@ -1075,6 +1314,27 @@ namespace DigitalGardener
             catch (Exception ex) { AddReport("Помощь", $"Ошибка: {ex.Message}"); }
         }
 
+        // ==================== КОРЗИНА ====================
+        private void OpenRecycleBin_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = "shell:RecycleBinFolder",
+                    UseShellExecute = true
+                });
+                AddReport("Корзина", "Открыта корзина Windows.");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Корзина", $"Не удалось открыть: {ex.Message}");
+                LoggerService.LogError("Ошибка открытия корзины",
+                    nameof(OpenRecycleBin_Click), ex);
+            }
+        }
+
         // ==================== EXPLORER ====================
         private void OpenInExplorer_Click(object sender, RoutedEventArgs e)
         {
@@ -1088,12 +1348,10 @@ namespace DigitalGardener
             {
                 var item = dg.SelectedItem;
                 if (item == null) return;
-
                 var type = item.GetType();
                 string? path = (type.GetProperty("FullPath")?.GetValue(item)
                             ?? type.GetProperty("FilePath")?.GetValue(item)
                             ?? type.GetProperty("Path")?.GetValue(item)) as string;
-
                 if (!string.IsNullOrEmpty(path))
                     FileOpener.ShowInExplorer(path);
             }
@@ -1103,7 +1361,7 @@ namespace DigitalGardener
             }
         }
 
-        // ==================== ARCHIVE FOLDER ====================
+        // ==================== АРХИВ ====================
         private void OpenArchiveFolder_Click(object sender, RoutedEventArgs e)
         {
             string dir = GetArchiveDir();
@@ -1111,29 +1369,9 @@ namespace DigitalGardener
             AddReport("Архив", $"Открыта папка: {dir}");
         }
 
-        // ==================== HIDDEN FILES ====================
-        private void ToggleHiddenFiles_Click(object sender, RoutedEventArgs e)
-        {
-            var s = SettingsService.Current;
-            s.ShowHiddenFiles = !s.ShowHiddenFiles;
-            SettingsService.SaveCurrent();
-
-            AddReport("Настройки", s.ShowHiddenFiles
-                ? "Скрытые файлы теперь показываются."
-                : "Скрытые файлы скрыты.");
-
-            // Обновляем все представления
-            foreach (var coll in new System.Collections.IEnumerable[]
-                { TempFiles, BrowserCacheFiles, GameCacheItems, UnusedFiles })
-            {
-                CollectionViewSource.GetDefaultView(coll)?.Refresh();
-            }
-        }
-
-        // ==================== SETTINGS WINDOW ====================
+        // ==================== НАСТРОЙКИ ОКНО ====================
         private void OpenSettings_Click(object sender, RoutedEventArgs e)
         {
-            // Открываем простое окно настроек (встроенное)
             var dlg = new SettingsWindow(SettingsService.Current) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
@@ -1178,15 +1416,17 @@ namespace DigitalGardener
                     s.TrayHintShown = true;
                     SettingsService.SaveCurrent();
                     _trayManager.ShowNotification("Digital Gardener",
-                        "Приложение свёрнуто в трей. Двойной клик по иконке — открыть.");
+                        "Свёрнуто в трей. Двойной клик — открыть.");
                 }
             }
             else
             {
+                LoggerService.OnErrorLogged -= OnErrorLoggedFromService;
                 _trayManager.Dispose();
                 _diskSpaceTimer?.Stop();
                 _monitorTimer?.Stop();
                 _processTimer?.Stop();
+                SystemMonitor.Dispose();
             }
         }
 
@@ -1202,7 +1442,7 @@ namespace DigitalGardener
                     s.TrayHintShown = true;
                     SettingsService.SaveCurrent();
                     _trayManager.ShowNotification("Digital Gardener",
-                        "Свёрнуто в трей. Двойной клик по иконке — открыть.");
+                        "Свёрнуто в трей. Двойной клик — открыть.");
                 }
             }
         }
@@ -1214,57 +1454,32 @@ namespace DigitalGardener
             {
                 bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
-                // Ctrl+A — выбрать все в текущей таблице
                 if (ctrl && e.Key == Key.A)
                 {
                     var dg = FindFocusedDataGrid();
-                    if (dg != null)
-                    {
-                        SelectAllInDataGrid(dg);
-                        e.Handled = true;
-                    }
+                    if (dg != null) { SelectAllInDataGrid(dg); e.Handled = true; }
                 }
-                // Delete — удалить выбранные
                 else if (e.Key == Key.Delete)
                 {
                     var dg = FindFocusedDataGrid();
                     if (dg != null && dg.SelectedItem != null)
-                    {
-                        DeleteSelectedInGrid(dg);
-                        e.Handled = true;
-                    }
+                    { DeleteSelectedInGrid(dg); e.Handled = true; }
                 }
-                // F5 — обновить
                 else if (e.Key == Key.F5)
                 {
                     var dg = FindFocusedDataGrid();
-                    if (dg != null)
-                    {
-                        RefreshCurrentTab();
-                        e.Handled = true;
-                    }
+                    if (dg != null) { RefreshCurrentTab(); e.Handled = true; }
                 }
-                // Ctrl+E — экспорт
                 else if (ctrl && e.Key == Key.E)
                 {
                     var dg = FindFocusedDataGrid();
-                    if (dg != null)
-                    {
-                        ExportCurrentGrid(dg);
-                        e.Handled = true;
-                    }
+                    if (dg != null) { ExportCurrentGrid(dg); e.Handled = true; }
                 }
-                // Escape — снять выделение
                 else if (e.Key == Key.Escape)
                 {
                     var dg = FindFocusedDataGrid();
-                    if (dg != null)
-                    {
-                        dg.SelectedItems.Clear();
-                        e.Handled = true;
-                    }
+                    if (dg != null) { dg.SelectedItems.Clear(); e.Handled = true; }
                 }
-                // Ctrl+S — настройки
                 else if (ctrl && e.Key == Key.S)
                 {
                     OpenSettings_Click(sender, new RoutedEventArgs());
@@ -1295,13 +1510,8 @@ namespace DigitalGardener
                     foreach (var item in items)
                     {
                         var prop = item.GetType().GetProperty("IsSelected");
-                        if (prop != null && prop.GetValue(item) is bool b && !b)
-                        {
-                            all = false;
-                            break;
-                        }
+                        if (prop != null && prop.GetValue(item) is bool b && !b) { all = false; break; }
                     }
-
                     foreach (var item in items)
                     {
                         var prop = item.GetType().GetProperty("IsSelected");
@@ -1319,6 +1529,7 @@ namespace DigitalGardener
                 if (dg.ItemsSource == TempFiles) DeleteSelected_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == BrowserCacheFiles) DeleteSelectedBrowser_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == UnusedFiles) DeleteSelectedUnused_Click(dg, new RoutedEventArgs());
+                else if (dg.ItemsSource == ArchiveFiles) ArchiveDeleteSelected_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == RunningProcesses) KillProcess_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == DuplicateCandidates) DeleteDuplicateToRecycleBin_Click(dg, new RoutedEventArgs());
             }
@@ -1333,6 +1544,7 @@ namespace DigitalGardener
                 else if (BrowserDataGrid?.IsVisible == true) ScanBrowserCache_Click(this, new RoutedEventArgs());
                 else if (GameCacheDataGrid?.IsVisible == true) ScanGameCache_Click(this, new RoutedEventArgs());
                 else if (UnusedDataGrid?.IsVisible == true) ScanUnusedFiles_Click(this, new RoutedEventArgs());
+                else if (ArchiveDataGrid?.IsVisible == true) ScanArchives_Click(this, new RoutedEventArgs());
                 else if (DuplicatesDataGrid?.IsVisible == true) ScanDuplicates_Click(this, new RoutedEventArgs());
                 else if (ProcessesDataGrid?.IsVisible == true) MonitorProcesses_Click(this, new RoutedEventArgs());
             }
@@ -1347,6 +1559,7 @@ namespace DigitalGardener
                 else if (dg.ItemsSource == BrowserCacheFiles) ExportBrowserCsv_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == GameCacheItems) ExportGameCsv_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == UnusedFiles) ExportUnusedCsv_Click(dg, new RoutedEventArgs());
+                else if (dg.ItemsSource == ArchiveFiles) ExportArchiveCsv_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == DuplicateCandidates) ExportDupCsv_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == StartupItems) ExportStartupCsv_Click(dg, new RoutedEventArgs());
                 else if (dg.ItemsSource == RunningProcesses) ExportProcCsv_Click(dg, new RoutedEventArgs());
@@ -1361,11 +1574,6 @@ namespace DigitalGardener
         {
             var entry = new ReportItem(category, message);
             ReportItems.Add(entry);
-            if (LogTextBox != null)
-            {
-                LogTextBox.AppendText($"[{entry.Timestamp}] [{category}] {message}{Environment.NewLine}");
-                LogTextBox.ScrollToEnd();
-            }
         }
 
         private void UpdateExtCombo<T>(ComboBox combo, ObservableCollection<T> items)
@@ -1389,11 +1597,7 @@ namespace DigitalGardener
         {
             try
             {
-                if (items.Count == 0)
-                {
-                    AddReport("Экспорт", "Таблица пуста.");
-                    return;
-                }
+                if (items.Count == 0) { AddReport("Экспорт", "Таблица пуста."); return; }
                 string path = TableViewHelper.ExportToCsv(items, tableName);
                 AddReport("Экспорт", $"Сохранено: {Path.GetFileName(path)}");
             }
@@ -1404,7 +1608,8 @@ namespace DigitalGardener
             }
         }
 
-        private void DeleteItems(List<object> allItems, bool toRecycle)
+        // ==================== УДАЛЕНИЕ ====================
+        private async void DeleteItems(List<object> allItems, bool toRecycle)
         {
             var selected = allItems.Where(x =>
             {
@@ -1412,50 +1617,68 @@ namespace DigitalGardener
                 return prop != null && prop.GetValue(x) is bool b && b;
             }).ToList();
 
-            if (selected.Count == 0)
+            if (selected.Count == 0) { AddReport("Удаление", "Ничего не выбрано."); return; }
+
+            ShowBusy("Удаление файлов...", "Не закрывайте программу, идёт удаление");
+
+            var result = await Task.Run(() =>
             {
-                AddReport("Удаление", "Ничего не выбрано.");
-                return;
-            }
+                int deleted = 0, notFound = 0, skipped = 0;
+                long freedTotal = 0;
 
-            int ok = 0;
-            foreach (var obj in selected)
-            {
-                var type = obj.GetType();
-                string? path = type.GetProperty("FullPath")?.GetValue(obj) as string;
-                if (string.IsNullOrEmpty(path)) continue;
-
-                try
+                for (int i = 0; i < selected.Count; i++)
                 {
-                    if (Directory.Exists(path))
-                    {
-                        if (toRecycle)
-                            FileSystem.DeleteDirectory(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                        else
-                            Directory.Delete(path, recursive: true);
-                    }
-                    else
-                    {
-                        if (toRecycle)
-                            FileSystem.DeleteFile(path, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                        else
-                            File.Delete(path);
-                    }
+                    var obj = selected[i];
+                    var type = obj.GetType();
+                    string? path = type.GetProperty("FullPath")?.GetValue(obj) as string;
 
-                    if (obj is SystemFileItem sf) TempFiles.Remove(sf);
-                    if (obj is SystemFileItem sf2) BrowserCacheFiles.Remove(sf2);
-                    if (obj is SystemFileItem sf3) UnusedFiles.Remove(sf3);
-                    if (obj is DuplicateItem di) DuplicateCandidates.Remove(di);
-                    ok++;
+                    UpdateBusy(i + 1, selected.Count,
+                        $"{i + 1} / {selected.Count} — {Path.GetFileName(path)}");
+
+                    if (string.IsNullOrEmpty(path)) continue;
+
+                    long freed = 0;
+                    string r = SafeFileDeleter.DeleteOne(path, toRecycle, out freed);
+
+                    switch (r)
+                    {
+                        case "ok": deleted++; freedTotal += freed; break;
+                        case "notfound": notFound++; break;
+                        case "skipped": skipped++; break;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    LoggerService.LogError($"Не удалось удалить {path}", nameof(DeleteItems), ex);
-                }
-            }
-            AddReport("Удаление", $"Удалено: {ok}/{selected.Count}");
+
+                return new { deleted, notFound, skipped, freedTotal };
+            });
+
+            foreach (var obj in selected) RemoveFromCollections(obj);
+
+            HideBusy();
+
+            var parts = new List<string> { $"удалено: {result.deleted}" };
+            if (result.notFound > 0) parts.Add($"уже удалено: {result.notFound}");
+            if (result.skipped > 0) parts.Add($"пропущено (занято): {result.skipped}");
+            parts.Add($"освобождено: {CollectionSummary.FormatSize(result.freedTotal)}");
+
+            AddReport("Удаление", string.Join(" | ", parts));
         }
 
+        private void RemoveFromCollections(object obj)
+        {
+            if (obj is SystemFileItem sf)
+            {
+                TempFiles.Remove(sf);
+                BrowserCacheFiles.Remove(sf);
+                UnusedFiles.Remove(sf);
+                ArchiveFiles.Remove(sf);
+            }
+            else if (obj is DuplicateItem di)
+            {
+                DuplicateCandidates.Remove(di);
+            }
+        }
+
+        // ==================== АРХИВАЦИЯ (перенос в папку) ====================
         private void ArchiveItems(List<object> allItems)
         {
             var selected = allItems.Where(x =>
@@ -1464,41 +1687,55 @@ namespace DigitalGardener
                 return prop != null && prop.GetValue(x) is bool b && b;
             }).ToList();
 
-            if (selected.Count == 0)
-            {
-                AddReport("Архив", "Ничего не выбрано.");
-                return;
-            }
+            if (selected.Count == 0) { AddReport("Архив", "Ничего не выбрано."); return; }
 
             string archiveDir = GetArchiveDir();
             int ok = 0;
+            int skipped = 0;
+
             foreach (var obj in selected)
             {
                 var type = obj.GetType();
                 string? path = type.GetProperty("FullPath")?.GetValue(obj) as string;
                 string? name = type.GetProperty("Name")?.GetValue(obj) as string;
+
                 if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(name)) continue;
+
                 try
                 {
                     string dest = MakeUniquePath(archiveDir, name);
 
                     if (Directory.Exists(path))
                         Directory.Move(path, dest);
-                    else
+                    else if (File.Exists(path))
                         File.Move(path, dest);
+                    else
+                        continue;
 
-                    if (obj is SystemFileItem sf) TempFiles.Remove(sf);
-                    if (obj is SystemFileItem sf2) BrowserCacheFiles.Remove(sf2);
-                    if (obj is SystemFileItem sf3) UnusedFiles.Remove(sf3);
-                    if (obj is DuplicateItem di) DuplicateCandidates.Remove(di);
+                    RemoveFromCollections(obj);
                     ok++;
+                }
+                catch (IOException)
+                {
+                    skipped++;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    skipped++;
                 }
                 catch (Exception ex)
                 {
-                    LoggerService.LogError($"Не удалось архивировать {path}", nameof(ArchiveItems), ex);
+                    LoggerService.LogError($"Не удалось архивировать {path}",
+                        nameof(ArchiveItems), ex);
+                    skipped++;
                 }
             }
-            AddReport("Архив", $"В архив: {ok}/{selected.Count}");
+
+            string message = $"В архив: {ok}/{selected.Count}";
+            if (skipped > 0)
+                message += $" (пропущено (занято): {skipped})";
+
+            AddReport("Архив", message);
         }
 
         private static string GetArchiveDir()
@@ -1512,12 +1749,230 @@ namespace DigitalGardener
         {
             string dest = Path.Combine(dir, fileName);
             if (!File.Exists(dest) && !Directory.Exists(dest)) return dest;
+
             string name = Path.GetFileNameWithoutExtension(fileName);
             string ext = Path.GetExtension(fileName);
             int n = 1;
+
             while (File.Exists(dest) || Directory.Exists(dest))
                 dest = Path.Combine(dir, $"{name}_{n++}{ext}");
+
             return dest;
+        }
+
+        // ==================== ЖУРНАЛ ОШИБОК (с диска) ====================
+        private void RefreshLog_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                LogTextBox.Text = LoggerService.GetLogContents();
+                LogTextBox.ScrollToEnd();
+                AddReport("Журнал", "Журнал ошибок обновлён.");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Журнал", $"Ошибка чтения журнала: {ex.Message}");
+            }
+        }
+
+        private void ClearLog_Click(object sender, RoutedEventArgs e)
+        {
+            var answer = MessageBox.Show(
+                $"Удалить файл журнала текущей сессии?\n\n" +
+                $"Файл: {LoggerService.GetCurrentLogFileName()}\n\n" +
+                "Это действие необратимо. Старые логи из папки DigitalGardener_Logs не затрагиваются.",
+                "Очистить журнал ошибок?",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (answer != MessageBoxResult.Yes) return;
+
+            bool deleted = LoggerService.ClearCurrentLog();
+
+            LogTextBox.Text =
+                "=== Журнал ошибок текущей сессии ===" + Environment.NewLine +
+                $"Файл: {LoggerService.GetCurrentLogFileName()}" + Environment.NewLine +
+                (deleted ? "Файл журнала удалён." : "Файл журнала уже пуст.") + Environment.NewLine +
+                new string('-', 50) + Environment.NewLine;
+
+            AddReport("Журнал", deleted
+                ? "Файл журнала ошибок текущей сессии удалён."
+                : "Файл журнала ошибок уже пуст.");
+        }
+
+        private void OpenLogsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string dir = LoggerService.GetLogsFolderPath();
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{dir}\"",
+                    UseShellExecute = true
+                });
+                AddReport("Журнал", $"Открыта папка логов: {dir}");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Журнал", $"Не удалось открыть папку: {ex.Message}");
+            }
+        }
+
+        private void ExportLogTxt_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string content = LoggerService.GetLogContents();
+                if (string.IsNullOrWhiteSpace(content) || content.StartsWith("Записей"))
+                {
+                    AddReport("Экспорт", "Журнал ошибок пуст — нечего экспортировать.");
+                    return;
+                }
+                string path = ReportExporter.ExportLogToTxt(content);
+                AddReport("Экспорт", $"Лог сохранён в TXT: {Path.GetFileName(path)}");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Экспорт", $"Ошибка: {ex.Message}");
+                LoggerService.LogError("Ошибка экспорта лога в TXT", nameof(ExportLogTxt_Click), ex);
+            }
+        }
+
+        private void ExportLogCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string content = LoggerService.GetLogContents();
+                if (string.IsNullOrWhiteSpace(content) || content.StartsWith("Записей"))
+                {
+                    AddReport("Экспорт", "Журнал ошибок пуст — нечего экспортировать.");
+                    return;
+                }
+                string path = ReportExporter.ExportLogToCsv(content);
+                AddReport("Экспорт", $"Лог сохранён в CSV: {Path.GetFileName(path)}");
+            }
+            catch (Exception ex)
+            {
+                AddReport("Экспорт", $"Ошибка: {ex.Message}");
+                LoggerService.LogError("Ошибка экспорта лога в CSV", nameof(ExportLogCsv_Click), ex);
+            }
+        }
+
+        // ==================== REPORT EXPORT ====================
+        private void ExportTxt_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ReportItems.Count == 0) { AddReport("Экспорт", "Отчёт пуст."); return; }
+                string path = ReportExporter.ExportToTxt(ReportItems);
+                AddReport("Экспорт", $"Сохранено в TXT: {Path.GetFileName(path)}");
+            }
+            catch (Exception ex) { AddReport("Экспорт", $"Ошибка: {ex.Message}"); }
+        }
+
+        private void ExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ReportItems.Count == 0) { AddReport("Экспорт", "Отчёт пуст."); return; }
+                string path = ReportExporter.ExportToCsv(ReportItems);
+                AddReport("Экспорт", $"Сохранено в CSV: {Path.GetFileName(path)}");
+            }
+            catch (Exception ex) { AddReport("Экспорт", $"Ошибка: {ex.Message}"); }
+        }
+
+        private void OpenReportsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            ReportExporter.OpenReportsFolder();
+            AddReport("Экспорт", "Открыта папка с отчётами.");
+        }
+
+        private void DeleteAllReports_Click(object sender, RoutedEventArgs e)
+        {
+            var (deleted, freed) = ReportExporter.DeleteAllReports();
+            AddReport("Экспорт", $"Удалено файлов: {deleted}. Освобождено: {CollectionSummary.FormatSize(freed)}");
+        }
+
+        private void ClearReport_Click(object sender, RoutedEventArgs e)
+        {
+            ReportItems.Clear();
+            AddReport("Журнал", "Журнал очищен.");
+        }
+
+        // ==================== UPDATE CHECK ====================
+        private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            AddReport("Обновление", $"Проверка обновлений (текущая версия: {UpdateChecker.CurrentVersion})...");
+
+            var info = await UpdateChecker.CheckAsync();
+
+            if (info.CheckFailed)
+            {
+                AddReport("Обновление", "Не удалось проверить обновления.");
+
+                var openManual = MessageBox.Show(
+                    $"Не удалось автоматически проверить обновления.\n\n" +
+                    $"Ваша версия: {UpdateChecker.CurrentVersion}\n\n" +
+                    $"Открыть страницу релизов на GitHub?",
+                    "Проверка обновлений",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (openManual == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = UpdateChecker.ReleasesPageUrl,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex) { AddReport("Обновление", $"Ошибка: {ex.Message}"); }
+                }
+                return;
+            }
+
+            if (!info.HasUpdate)
+            {
+                AddReport("Обновление", $"У вас последняя версия {UpdateChecker.CurrentVersion}.");
+
+                MessageBox.Show(
+                    $"У вас последняя версия: v{UpdateChecker.CurrentVersion}",
+                    "Обновления не найдены",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            AddReport("Обновление", $"Доступна версия: v{info.LatestVersion}");
+
+            var openPage = MessageBox.Show(
+                $"🎉 Доступна новая версия v{info.LatestVersion}!\n\n" +
+                $"Ваша версия: v{UpdateChecker.CurrentVersion}\n\n" +
+                "Открыть страницу релизов?",
+                "Доступно обновление",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (openPage == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = string.IsNullOrEmpty(info.HtmlUrl)
+                            ? UpdateChecker.ReleasesPageUrl
+                            : info.HtmlUrl,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex) { AddReport("Обновление", $"Ошибка: {ex.Message}"); }
+            }
         }
     }
 }

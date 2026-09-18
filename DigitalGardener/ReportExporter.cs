@@ -14,7 +14,7 @@ namespace DigitalGardener
             return dir;
         }
 
-        /// <summary>Сохранить отчёт в TXT. Возвращает полный путь.</summary>
+        // ==================== ОТЧЁТ (сессия) ====================
         public static string ExportToTxt(IEnumerable<ReportItem> items)
         {
             string dir = GetReportsDir();
@@ -33,7 +33,6 @@ namespace DigitalGardener
             return file;
         }
 
-        /// <summary>Сохранить отчёт в CSV. Возвращает полный путь.</summary>
         public static string ExportToCsv(IEnumerable<ReportItem> items)
         {
             string dir = GetReportsDir();
@@ -52,7 +51,45 @@ namespace DigitalGardener
             return file;
         }
 
-        /// <summary>Удалить все сохранённые отчёты. Возвращает (удалено файлов, освобождено байт).</summary>
+        // ==================== ЖУРНАЛ (лог ошибок с диска) ====================
+        public static string ExportLogToTxt(string logContent)
+        {
+            string dir = GetReportsDir();
+            string file = Path.Combine(dir, $"journal_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Digital Gardener — Журнал (Лог ошибок) ===");
+            sb.AppendLine($"Дата выгрузки: {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
+            sb.AppendLine($"Версия: {UpdateChecker.CurrentVersion}");
+            sb.AppendLine($"ОС: {Environment.OSVersion}");
+            sb.AppendLine($"ПК: {Environment.MachineName}");
+            sb.AppendLine(new string('=', 50));
+            sb.AppendLine();
+            sb.AppendLine(logContent);
+
+            File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
+            return file;
+        }
+
+        public static string ExportLogToCsv(string logContent)
+        {
+            string dir = GetReportsDir();
+            string file = Path.Combine(dir, $"journal_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv");
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Line");
+
+            foreach (var line in logContent.Split('\n'))
+            {
+                string clean = line.Replace("\r", "").Replace("\"", "\"\"");
+                sb.AppendLine($"\"{clean}\"");
+            }
+
+            File.WriteAllText(file, sb.ToString(), Encoding.UTF8);
+            return file;
+        }
+
+        // ==================== ОЧИСТКА ====================
         public static (int deleted, long freedBytes) DeleteAllReports()
         {
             string dir = GetReportsDir();
@@ -61,7 +98,7 @@ namespace DigitalGardener
 
             try
             {
-                foreach (var f in Directory.GetFiles(dir, "report_*.*"))
+                foreach (var f in Directory.GetFiles(dir, "*.*"))
                 {
                     try
                     {
@@ -78,7 +115,6 @@ namespace DigitalGardener
             return (count, bytes);
         }
 
-        /// <summary>Открыть папку с отчётами в проводнике.</summary>
         public static void OpenReportsFolder()
         {
             string dir = GetReportsDir();

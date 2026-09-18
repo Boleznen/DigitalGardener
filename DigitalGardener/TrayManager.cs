@@ -18,7 +18,6 @@ namespace DigitalGardener
 
         public bool IsVisible => _notifyIcon?.Visible == true;
 
-        /// <summary>Инициализация иконки в трее.</summary>
         public void Initialize(Window mainWindow)
         {
             _mainWindow = mainWindow;
@@ -35,7 +34,6 @@ namespace DigitalGardener
                 };
 
                 _notifyIcon.DoubleClick += (_, __) => OnShowRequested?.Invoke();
-
                 _notifyIcon.ContextMenuStrip = BuildContextMenu();
             }
             catch (Exception ex)
@@ -74,56 +72,77 @@ namespace DigitalGardener
             return menu;
         }
 
+        /// <summary>
+        /// Загружает иконку для трея. 4 попытки:
+        /// 1) Из ресурсов приложения.
+        /// 2) Из файла app.ico рядом с .exe.
+        /// 3) Из встроенной в .exe.
+        /// 4) Стандартная.
+        /// </summary>
         private Icon LoadAppIcon()
         {
-            // Пытаемся загрузить app.ico из папки приложения
+            // 1) Ресурсы приложения
+            try
+            {
+                var uri = new Uri("pack://application:,,,/app.ico");
+                var streamInfo = System.Windows.Application.GetResourceStream(uri);
+                if (streamInfo?.Stream != null)
+                {
+                    using var s = streamInfo.Stream;
+                    return new Icon(s);
+                }
+            }
+            catch { }
+
+            // 2) Файл рядом с .exe
             try
             {
                 string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.ico");
                 if (File.Exists(icoPath))
                     return new Icon(icoPath);
-
-                // Пытаемся взять из exe
-                string exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var extracted = Icon.ExtractAssociatedIcon(exePath);
-                if (extracted != null) return extracted;
             }
             catch { }
 
-            // Fallback — стандартная иконка приложения Windows
+            // 3) Из встроенной в .exe иконки
+            try
+            {
+                string? exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(exePath))
+                    exePath = Environment.ProcessPath;
+
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var extracted = Icon.ExtractAssociatedIcon(exePath);
+                    if (extracted != null) return extracted;
+                }
+            }
+            catch { }
+
             return SystemIcons.Application;
         }
 
-        /// <summary>Показать иконку в трее.</summary>
         public void Show()
         {
             if (_notifyIcon != null) _notifyIcon.Visible = true;
         }
 
-        /// <summary>Скрыть иконку.</summary>
         public void Hide()
         {
             if (_notifyIcon != null) _notifyIcon.Visible = false;
         }
 
-        /// <summary>Показать всплывающее уведомление.</summary>
         public void ShowNotification(string title, string text,
             ToolTipIcon icon = ToolTipIcon.Info, int timeoutMs = 3000)
         {
-            try
-            {
-                _notifyIcon?.ShowBalloonTip(timeoutMs, title, text, icon);
-            }
+            try { _notifyIcon?.ShowBalloonTip(timeoutMs, title, text, icon); }
             catch { }
         }
 
-        /// <summary>Восстановить главное окно из трея.</summary>
         public void RestoreMainWindow()
         {
             try
             {
                 if (_mainWindow == null) return;
-
                 _mainWindow.Show();
                 _mainWindow.WindowState = WindowState.Normal;
                 _mainWindow.Activate();
@@ -134,7 +153,6 @@ namespace DigitalGardener
             catch { }
         }
 
-        /// <summary>Свернуть окно в трей.</summary>
         public void MinimizeToTray()
         {
             try

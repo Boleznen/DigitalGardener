@@ -14,102 +14,80 @@ namespace DigitalGardener
 {
     public static class TableViewHelper
     {
-        // ==================== СОХРАНЕНИЕ ВЫДЕЛЕНИЯ ====================
+        public const string AllExtensionsLabel = "(все расширения)";
 
-        /// <summary>
-        /// Сохраняет выделение по уникальному полю (FullPath, Id, Name).
-        /// Возвращает HashSet сохранённых ключей.
-        /// </summary>
+        // ==================== СОХРАНЕНИЕ ВЫДЕЛЕНИЯ ====================
         public static HashSet<string> SaveSelection<T>(IEnumerable<T> items, string keyField)
         {
             var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
             try
             {
                 foreach (var item in items)
                 {
                     var prop = item?.GetType().GetProperty(keyField);
                     if (prop == null) continue;
-
                     var selProp = item!.GetType().GetProperty("IsSelected");
                     if (selProp == null) continue;
-
                     if (selProp.GetValue(item) is bool isSelected && isSelected)
                     {
                         var value = prop.GetValue(item)?.ToString();
-                        if (!string.IsNullOrEmpty(value))
-                            result.Add(value);
+                        if (!string.IsNullOrEmpty(value)) result.Add(value);
                     }
                 }
             }
             catch { }
-
             return result;
         }
 
-        /// <summary>
-        /// Восстанавливает выделение после пересканирования.
-        /// </summary>
         public static void RestoreSelection<T>(IEnumerable<T> items,
             HashSet<string> savedKeys, string keyField)
         {
             if (savedKeys == null || savedKeys.Count == 0) return;
-
             try
             {
                 foreach (var item in items)
                 {
                     if (item == null) continue;
-
                     var prop = item.GetType().GetProperty(keyField);
                     if (prop == null) continue;
-
                     var selProp = item.GetType().GetProperty("IsSelected");
                     if (selProp == null) continue;
-
                     var value = prop.GetValue(item)?.ToString();
                     if (!string.IsNullOrEmpty(value) && savedKeys.Contains(value))
-                    {
                         selProp.SetValue(item, true);
-                    }
                 }
             }
             catch { }
         }
 
         // ==================== ПОИСК И ФИЛЬТР ====================
-
-        /// <summary>
-        /// Применяет фильтр + поиск к ICollectionView коллекции.
-        /// </summary>
         public static void ApplyFilter(ICollectionView view,
             string searchText, string extensionFilter)
         {
             if (view == null) return;
 
+            bool filterByExt = !string.IsNullOrEmpty(extensionFilter)
+                && extensionFilter != AllExtensionsLabel
+                && extensionFilter != "Все файлы";
+
             view.Filter = (obj) =>
             {
                 if (obj == null) return false;
 
-                // Расширение
-                if (!string.IsNullOrEmpty(extensionFilter) &&
-                    extensionFilter != "Все файлы")
+                if (filterByExt)
                 {
                     var name = GetPropertyValue(obj, "Name") ??
                                GetPropertyValue(obj, "DisplayName") ??
                                GetPropertyValue(obj, "ProcessName") ?? "";
-
                     string ext = Path.GetExtension(name);
                     if (!ext.Equals(extensionFilter, StringComparison.OrdinalIgnoreCase))
                         return false;
                 }
 
-                // Поиск
                 if (!string.IsNullOrWhiteSpace(searchText))
                 {
                     string lower = searchText.ToLowerInvariant();
                     var found = false;
-
                     foreach (var field in new[] { "Name", "FullPath", "DisplayName", "ProcessName", "Publisher", "Reason" })
                     {
                         var val = GetPropertyValue(obj, field);
@@ -120,10 +98,8 @@ namespace DigitalGardener
                             break;
                         }
                     }
-
                     if (!found) return false;
                 }
-
                 return true;
             };
         }
@@ -138,27 +114,17 @@ namespace DigitalGardener
             catch { return null; }
         }
 
-        // ==================== ПОЛУЧЕНИЕ СПИСКА РАСШИРЕНИЙ ====================
-
-        /// <summary>
-        /// Возвращает уникальные расширения файлов из коллекции (для фильтра).
-        /// </summary>
+        // ==================== СПИСОК РАСШИРЕНИЙ ====================
         public static List<string> GetExtensions<T>(IEnumerable<T> items)
         {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "Все файлы"
-            };
-
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 foreach (var item in items)
                 {
                     if (item == null) continue;
-
                     var name = GetPropertyValue(item, "Name");
                     if (string.IsNullOrEmpty(name)) continue;
-
                     string ext = Path.GetExtension(name);
                     if (!string.IsNullOrEmpty(ext))
                         set.Add(ext.ToLowerInvariant());
@@ -166,15 +132,12 @@ namespace DigitalGardener
             }
             catch { }
 
-            return set.OrderBy(x => x == "Все файлы" ? "" : x).ToList();
+            var result = new List<string> { AllExtensionsLabel };
+            result.AddRange(set.OrderBy(x => x));
+            return result;
         }
 
         // ==================== ЭКСПОРТ В CSV ====================
-
-        /// <summary>
-        /// Экспортирует любую коллекцию в CSV-файл.
-        /// Автоматически определяет колонки по публичным свойствам.
-        /// </summary>
         public static string ExportToCsv<T>(IEnumerable<T> items, string tableName)
         {
             string dir = ReportExporter.GetReportsDir();
@@ -182,29 +145,19 @@ namespace DigitalGardener
                 $"table_{tableName}_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.csv");
 
             var sb = new StringBuilder();
-
-            // Заголовки
             var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && IsSimpleType(p.PropertyType))
                 .ToList();
 
             sb.AppendLine(string.Join(";", props.Select(p => EscapeCsv(p.Name))));
 
-            // Данные
             foreach (var item in items)
             {
                 var row = new List<string>();
                 foreach (var p in props)
                 {
-                    try
-                    {
-                        var val = p.GetValue(item)?.ToString() ?? "";
-                        row.Add(EscapeCsv(val));
-                    }
-                    catch
-                    {
-                        row.Add("");
-                    }
+                    try { row.Add(EscapeCsv(p.GetValue(item)?.ToString() ?? "")); }
+                    catch { row.Add(""); }
                 }
                 sb.AppendLine(string.Join(";", row));
             }
@@ -226,21 +179,13 @@ namespace DigitalGardener
         private static string EscapeCsv(string value)
         {
             if (string.IsNullOrEmpty(value)) return "";
-
-            // Экранируем кавычки
             value = value.Replace("\"", "\"\"");
             return $"\"{value}\"";
         }
 
-        // ==================== ПОЛУЧЕНИЕ КЛЮЧЕВОГО ПОЛЯ ====================
-
-        /// <summary>
-        /// Определяет ключевое поле для сохранения выделения в зависимости от типа модели.
-        /// </summary>
         public static string GetKeyFieldForType<T>()
         {
             var type = typeof(T).Name;
-
             return type switch
             {
                 nameof(SystemFileItem) => "FullPath",

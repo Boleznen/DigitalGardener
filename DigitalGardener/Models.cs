@@ -30,7 +30,7 @@ namespace DigitalGardener
         public string Reason { get; set; } = "";
         public string Recommendation { get; set; } = "";
         public string Source { get; set; } = "";
-        public System.Windows.Media.ImageSource? Icon { get; set; }   // 🆕
+        public System.Windows.Media.ImageSource? Icon { get; set; }
         public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
@@ -43,7 +43,7 @@ namespace DigitalGardener
         public string SizeText => $"{SizeBytes:N0} байт";
         public int GroupId { get; set; }
         public string OriginalPath { get; set; } = "";
-        public System.Windows.Media.ImageSource? Icon { get; set; }   // 🆕
+        public System.Windows.Media.ImageSource? Icon { get; set; }
         public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
@@ -152,23 +152,30 @@ namespace DigitalGardener
         public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
-    // ==================== 🆕 НАСТРОЙКИ ====================
+    public class DriveChoiceItem
+    {
+        public string Name { get; set; } = "";
+        public string FullLabel { get; set; } = "";
+        public long FreeBytes { get; set; }
+        public long TotalBytes { get; set; }
+        public override string ToString() => FullLabel;
+    }
+
     public class AppSettings
     {
-        // Старые
         public int UnusedDays { get; set; } = 180;
         public bool AutoRefreshProcesses { get; set; } = false;
         public int AutoRefreshIntervalSec { get; set; } = 5;
-        public List<string> ScanRoots { get; set; } = new();
-        public bool IsAdminWarningShown { get; set; } = false;
         public bool ShowSystemMonitor { get; set; } = true;
+        public bool MinimizeToTray { get; set; } = false;
+        public bool CloseToTray { get; set; } = false;
+        public bool TrayHintShown { get; set; } = false;
 
-        // 🆕 Скрытые файлы
-        public bool ShowHiddenFiles { get; set; } = false;
+        public int ArchiveDays { get; set; } = 180;
 
-        // 🆕 Трей
-        public bool MinimizeToTray { get; set; } = false;   // сворачивать в трей
-        public bool CloseToTray { get; set; } = false;      // закрывать в трей
-        public bool TrayHintShown { get; set; } = false;    // подсказка про трей показана
+        public string SelectedDrive { get; set; } = "C:";
+
+        /// <summary>Область сканирования дубликатов: "UserFolders" | "WholeDrive"</summary>
+        public string DuplicateScanScope { get; set; } = "UserFolders";
     }
 }

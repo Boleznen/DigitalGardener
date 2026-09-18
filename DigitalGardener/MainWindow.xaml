@@ -135,8 +135,7 @@
                                             BorderBrush="{StaticResource ThemeAccent}"
                                             BorderThickness="1" CornerRadius="4">
                                         <ScrollViewer Background="{StaticResource ThemeItemBg}">
-                                            <StackPanel IsItemsHost="True"
-                                                        Background="{StaticResource ThemeItemBg}"/>
+                                            <StackPanel IsItemsHost="True" Background="{StaticResource ThemeItemBg}"/>
                                         </ScrollViewer>
                                     </Border>
                                 </Grid>
@@ -227,7 +226,7 @@
         </Style>
 
         <Style x:Key="FilterComboStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
-            <Setter Property="Width" Value="140"/>
+            <Setter Property="Width" Value="160"/>
             <Setter Property="Height" Value="32"/>
         </Style>
     </Window.Resources>
@@ -240,12 +239,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- ========== ШАПКА ========== -->
+        <!-- ШАПКА -->
         <Border Grid.Row="0" Background="{StaticResource ThemePanelBg}"
                 Padding="16,12" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -255,19 +256,23 @@
                     <TextBlock Text="Панель управления очисткой и оптимизацией системы"
                                Foreground="{StaticResource ThemeSubText}" VerticalAlignment="Center"/>
                 </StackPanel>
-                <Button Grid.Column="1" Content="⚙️ Настройки" Click="OpenSettings_Click"
+                <Button Grid.Column="1" Content="📂 Открыть архив" Click="OpenArchiveFolder_Click"
                         Margin="0,0,10,0"/>
-                <Button Grid.Column="2" Content="🔄 Проверить обновления" Click="CheckUpdates_Click"/>
+                <Button Grid.Column="2" Content="🗑️ Открыть корзину" Click="OpenRecycleBin_Click"
+                        Margin="0,0,10,0"/>
+                <Button Grid.Column="3" Content="⚙️ Настройки" Click="OpenSettings_Click"
+                        Margin="0,0,10,0"/>
+                <Button Grid.Column="4" Content="🔄 Проверить обновления" Click="CheckUpdates_Click"/>
             </Grid>
         </Border>
 
-        <!-- ========== КРАСНАЯ ПЛАШКА (если нет админа) ========== -->
+        <!-- ПЛАШКА "НЕТ АДМИНА" -->
         <Border Grid.Row="1" x:Name="AdminWarningPanel" Visibility="Collapsed"
                 Background="#7F1D1D" Padding="12,8"
                 BorderBrush="{StaticResource ThemeRed}" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="⚠️" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBlock Text="Приложение запущено без прав администратора. Часть функций может быть недоступна (автозагрузка HKLM, системные процессы)."
+                <TextBlock Text="Приложение запущено без прав администратора. Часть функций может быть недоступна."
                            Foreground="White" VerticalAlignment="Center"/>
                 <Button Content="Перезапустить от админа" Click="RestartAsAdmin_Click"
                         Background="#DC2626" Margin="20,0,0,0" Padding="12,6"/>
@@ -277,7 +282,7 @@
         <TabControl Grid.Row="2" Background="{StaticResource ThemeItemBg}"
                     BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0" Padding="12">
 
-            <!-- ==================== TEMP ==================== -->
+            <!-- TEMP -->
             <TabItem Header="Temp и Downloads">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -292,8 +297,8 @@
                         <Button Content="Удалить выбранные" Click="DeleteSelected_Click" Margin="0,0,10,0"/>
                         <Button Content="В корзину" Click="DeleteToRecycleBin_Click" Margin="0,0,10,0"/>
                         <Button Content="Архивировать" Click="ArchiveFile_Click" Margin="0,0,10,0"/>
-                        <Button Content="Открыть архив" Click="OpenArchiveFolder_Click" Margin="0,0,10,0"/>
-                        <Button Content="Выбрать все" Click="SelectAllTemp_Click"/>
+                        <Button Content="Выбрать все" Click="SelectAllTemp_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearTempList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -305,8 +310,7 @@
                                    VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox x:Name="TempExtCombo" Style="{StaticResource FilterComboStyle}"
                                   SelectionChanged="TempExt_SelectionChanged" Margin="0,0,12,0"/>
-                        <Button Content="📤 Экспорт CSV" Click="ExportTempCsv_Click" Margin="0,0,10,0"/>
-                        <Button Content="Показать скрытые" Click="ToggleHiddenFiles_Click"/>
+                        <Button Content="📤 Экспорт CSV" Click="ExportTempCsv_Click"/>
                     </StackPanel>
 
                     <DataGrid Grid.Row="2" x:Name="TempDataGrid" ItemsSource="{Binding TempFiles}"
@@ -330,12 +334,19 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <TextBlock Grid.Row="3" Text="{Binding TempSummary.Text}"
-                               Foreground="{StaticResource ThemeSubText}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding TempSummary.Text}"
+                                   Foreground="{StaticResource ThemeSubText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="ℹ️ Некоторые файлы могут не удалиться, если они сейчас используются (открыт браузер, Visual Studio и т.д.). Это нормально — они не будут удалены, но процесс продолжится."
+                                   Foreground="{StaticResource ThemeWarning}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
                 </Grid>
             </TabItem>
 
-            <!-- ==================== КЭШ БРАУЗЕРОВ ==================== -->
+            <!-- КЭШ БРАУЗЕРОВ -->
             <TabItem Header="Кэш браузеров">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -350,7 +361,8 @@
                         <Button Content="Удалить выбранные" Click="DeleteSelectedBrowser_Click" Margin="0,0,10,0"/>
                         <Button Content="В корзину" Click="RecycleSelectedBrowser_Click" Margin="0,0,10,0"/>
                         <Button Content="Архивировать" Click="ArchiveSelectedBrowser_Click" Margin="0,0,10,0"/>
-                        <Button Content="Выбрать все" Click="SelectAllBrowser_Click"/>
+                        <Button Content="Выбрать все" Click="SelectAllBrowser_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearBrowserList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -385,12 +397,19 @@
                         </DataGrid.Columns>
                     </DataGrid>
 
-                    <TextBlock Grid.Row="3" Text="{Binding BrowserSummary.Text}"
-                               Foreground="{StaticResource ThemeSubText}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                    <StackPanel Grid.Row="3" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding BrowserSummary.Text}"
+                                   Foreground="{StaticResource ThemeSubText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="ℹ️ Некоторые файлы могут не удалиться, если браузер сейчас открыт. Закройте браузер перед очисткой кэша — файлы удалятся полностью."
+                                   Foreground="{StaticResource ThemeWarning}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Margin="0,4,0,0"/>
+                    </StackPanel>
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ИГРОВОЙ КЭШ ==================== -->
+            <!-- ИГРОВОЙ КЭШ -->
             <TabItem Header="🎮 Игровой кэш">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -404,7 +423,8 @@
                         <Button Content="Сканировать игровой кэш" Click="ScanGameCache_Click" Margin="0,0,10,0"/>
                         <Button Content="Очистить выбранные" Click="CleanSelectedGameCache_Click" Margin="0,0,10,0"/>
                         <Button Content="Очистить ВСЁ" Click="CleanAllGameCache_Click" Margin="0,0,10,0"/>
-                        <Button Content="Выбрать все" Click="SelectAllGameCache_Click"/>
+                        <Button Content="Выбрать все" Click="SelectAllGameCache_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearGameList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -438,7 +458,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== НЕИСПОЛЬЗУЕМЫЕ ==================== -->
+            <!-- НЕИСПОЛЬЗУЕМЫЕ -->
             <TabItem Header="Неиспользуемые файлы">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -462,7 +482,7 @@
                         <Button Content="Удалить выбранные" Click="DeleteSelectedUnused_Click" Margin="0,0,10,0"/>
                         <Button Content="В корзину" Click="RecycleSelectedUnused_Click" Margin="0,0,10,0"/>
                         <Button Content="Архивировать" Click="ArchiveSelectedUnused_Click" Margin="0,0,10,0"/>
-                        <Button Content="Открыть архив" Click="OpenArchiveFolder_Click"/>
+                        <Button Content="Очистить список" Click="ClearUnusedList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -504,7 +524,72 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ДУБЛИКАТЫ ==================== -->
+            <!-- АРХИВЫ И УСТАНОВЩИКИ -->
+            <TabItem Header="📦 Архивы и установщики">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Не использовались более:" Foreground="{StaticResource ThemeMainText}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="ArchiveDaysCombo" Width="140" SelectedIndex="3" Margin="0,0,10,0"
+                                  SelectionChanged="ArchiveDaysCombo_SelectionChanged">
+                            <ComboBoxItem Content="30 дней"/>
+                            <ComboBoxItem Content="60 дней"/>
+                            <ComboBoxItem Content="90 дней"/>
+                            <ComboBoxItem Content="180 дней"/>
+                        </ComboBox>
+                        <Button Content="Сканировать" Click="ScanArchives_Click" Margin="0,0,10,0"/>
+                        <Button Content="В корзину" Click="ArchiveDeleteSelected_Click" Margin="0,0,10,0"/>
+                        <Button Content="Архивировать" Click="ArchiveSelected_Click" Margin="0,0,10,0"/>
+                        <Button Content="Выбрать все" Click="SelectAllArchives_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearArchiveList_Click"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="🔍 Поиск:" Foreground="{StaticResource ThemeSubText}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="ArchiveSearchBox" Style="{StaticResource SearchBoxStyle}"
+                                 TextChanged="ArchiveSearch_TextChanged" Margin="0,0,12,0"/>
+                        <TextBlock Text="Фильтр:" Foreground="{StaticResource ThemeSubText}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="ArchiveExtCombo" Style="{StaticResource FilterComboStyle}"
+                                  SelectionChanged="ArchiveExt_SelectionChanged" Margin="0,0,12,0"/>
+                        <Button Content="📤 Экспорт CSV" Click="ExportArchiveCsv_Click"/>
+                    </StackPanel>
+
+                    <DataGrid Grid.Row="2" x:Name="ArchiveDataGrid" ItemsSource="{Binding ArchiveFiles}"
+                              MouseDoubleClick="ArchiveDataGrid_MouseDoubleClick">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
+                                <MenuItem Header="В корзину" Click="ArchiveDeleteSelected_Click"/>
+                                <MenuItem Header="Архивировать" Click="ArchiveSelected_Click"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Header="✓" CellTemplate="{StaticResource CheckBoxCellTemplate}" Width="40"/>
+                            <DataGridTemplateColumn Header="Имя" Width="*"
+                                                    CellTemplate="{StaticResource NameWithIconTemplate}"/>
+                            <DataGridTextColumn Header="Путь" Binding="{Binding FullPath}" Width="2*"/>
+                            <DataGridTextColumn Header="Размер" Binding="{Binding SizeText}" Width="180"/>
+                            <DataGridTextColumn Header="Дата" Binding="{Binding LastAccessTime, StringFormat={}{0:dd.MM.yyyy HH:mm}}" Width="140"/>
+                            <DataGridTextColumn Header="Тип" Binding="{Binding Source}" Width="120"/>
+                            <DataGridTextColumn Header="Причина" Binding="{Binding Reason}" Width="220"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Grid.Row="3" Text="{Binding ArchiveSummary.Text}"
+                               Foreground="{StaticResource ThemeSubText}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- ДУБЛИКАТЫ -->
             <TabItem Header="Поиск дубликатов">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -515,10 +600,16 @@
                     </Grid.RowDefinitions>
 
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Сканировать:" Foreground="{StaticResource ThemeMainText}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="DuplicateScopeCombo" Width="220" SelectedIndex="0" Margin="0,0,10,0"
+                                  SelectionChanged="DuplicateScopeCombo_SelectionChanged">
+                            <ComboBoxItem Content="Папки пользователя (быстро)"/>
+                            <ComboBoxItem Content="Весь диск (долго)"/>
+                        </ComboBox>
                         <Button Content="Сканировать на дубликаты" Click="ScanDuplicates_Click" Margin="0,0,10,0"/>
                         <Button Content="Удалить дубликаты" Click="DeleteDuplicateToRecycleBin_Click" Margin="0,0,10,0"/>
-                        <Button Content="Архивировать дубликаты" Click="ArchiveDuplicate_Click" Margin="0,0,10,0"/>
-                        <Button Content="Открыть архив" Click="OpenArchiveFolder_Click"/>
+                        <Button Content="Очистить список" Click="ClearDupList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -535,7 +626,6 @@
                             <ContextMenu>
                                 <MenuItem Header="Открыть в проводнике" Click="OpenInExplorer_Click"/>
                                 <MenuItem Header="Удалить дубликаты" Click="DeleteDuplicateToRecycleBin_Click"/>
-                                <MenuItem Header="Архивировать дубликаты" Click="ArchiveDuplicate_Click"/>
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
@@ -553,7 +643,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== АВТОЗАГРУЗКА ==================== -->
+            <!-- АВТОЗАГРУЗКА -->
             <TabItem Header="Автозагрузка">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -566,7 +656,8 @@
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="Обновить список" Click="LoadStartupItems_Click" Margin="0,0,10,0"/>
                         <Button Content="Отключить выбранные" Click="DisableStartupItem_Click" Margin="0,0,10,0"/>
-                        <Button Content="Оптимизировать автозагрузку" Click="OptimizeStartup_Click"/>
+                        <Button Content="Оптимизировать автозагрузку" Click="OptimizeStartup_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearStartupList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -598,7 +689,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ПРОЦЕССЫ ==================== -->
+            <!-- ПРОЦЕССЫ -->
             <TabItem Header="Мониторинг процессов">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -617,13 +708,14 @@
                                   Foreground="{StaticResource ThemeMainText}"
                                   Checked="AutoRefreshProcesses_Changed"
                                   Unchecked="AutoRefreshProcesses_Changed"/>
-                        <ComboBox x:Name="AutoRefreshIntervalCombo" Width="80"
+                        <ComboBox x:Name="AutoRefreshIntervalCombo" Width="80" Margin="0,0,10,0"
                                   SelectionChanged="AutoRefreshInterval_Changed">
                             <ComboBoxItem Content="3 сек"/>
                             <ComboBoxItem Content="5 сек"/>
                             <ComboBoxItem Content="10 сек"/>
                             <ComboBoxItem Content="30 сек"/>
                         </ComboBox>
+                        <Button Content="Очистить список" Click="ClearProcessList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -657,7 +749,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== УДАЛЕНИЕ ПРОГРАММ ==================== -->
+            <!-- УДАЛЕНИЕ ПРОГРАММ -->
             <TabItem Header="🗑️ Удаление программ">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -674,7 +766,8 @@
                                    VerticalAlignment="Center" Margin="20,0,6,0"/>
                         <TextBlock x:Name="ProgramsCountText" Text="0"
                                    Foreground="{StaticResource ThemeMainText}"
-                                   FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                        <Button Content="Очистить список" Click="ClearProgramList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -702,12 +795,12 @@
                     </DataGrid>
 
                     <TextBlock Grid.Row="3"
-                               Text="Выберите программы и нажмите «Удалить выбранные». Откроется штатный деинсталлятор каждой программы."
+                               Text="Выберите программы и нажмите «Удалить выбранные»."
                                Foreground="{StaticResource ThemeSubText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ЗАБЛОКИРОВАННЫЕ ==================== -->
+            <!-- ЗАБЛОКИРОВАННЫЕ -->
             <TabItem Header="Заблокированные файлы">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -721,8 +814,9 @@
                         <Button Content="Добавить файл..." Click="AddLockedFile_Click" Margin="0,0,10,0"/>
                         <Button Content="Добавить папку..." Click="AddLockedFolder_Click" Margin="0,0,10,0"/>
                         <Button Content="Освободить (завершить процессы)" Click="UnlockSelected_Click" Margin="0,0,10,0"/>
-                        <Button Content="Удалить в корзину" Click="DeleteLockedFile_Click"/>
-                        <Button Content="Выбрать все" Click="SelectAllLocked_Click" Margin="10,0,0,0"/>
+                        <Button Content="Удалить в корзину" Click="DeleteLockedFile_Click" Margin="0,0,10,0"/>
+                        <Button Content="Выбрать все" Click="SelectAllLocked_Click" Margin="0,0,10,0"/>
+                        <Button Content="Очистить список" Click="ClearLockedList_Click"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
@@ -753,7 +847,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ОС и ХАРАКТЕРИСТИКИ + ГРАФИКИ ==================== -->
+            <!-- ОС И ХАРАКТЕРИСТИКИ -->
             <TabItem Header="ОС и характеристики">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -830,7 +924,7 @@
                 </Grid>
             </TabItem>
 
-            <!-- ==================== ПОМОЩЬ ==================== -->
+            <!-- ПОМОЩЬ -->
             <TabItem Header="📖 Помощь">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="20">
@@ -881,7 +975,7 @@
                                 <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap">
                                     <Run Text="Digital Gardener НЕ удаляет файлы безвозвратно. По умолчанию все удаления идут в "/>
                                     <Run Text="Корзину Windows" FontWeight="Bold"/>
-                                    <Run Text=" — вы всегда можете восстановить файл через Проводник (Win+E → Корзина)."/>
+                                    <Run Text=" — вы всегда можете восстановить файл через Проводник (Win+E → Корзина) или кнопкой «Открыть корзину» в шапке приложения."/>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
@@ -891,14 +985,14 @@
                                 BorderThickness="1" CornerRadius="6"
                                 Padding="14" Margin="0,0,0,20">
                             <StackPanel>
-                                <TextBlock Text="🛡️ Права администратора"
+                                <TextBlock Text="📦 Архивирование"
                                            FontSize="16" FontWeight="Bold"
                                            Foreground="{StaticResource ThemeMainText}"
                                            Margin="0,0,0,10"/>
                                 <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap">
-                                    <Run Text="Приложение требует права администратора при запуске (UAC). Без них "/>
-                                    <Run Text="некоторые функции будут недоступны" FontWeight="Bold"/>
-                                    <Run Text=": отключение автозагрузки HKLM, завершение системных процессов, удаление системных файлов."/>
+                                    <Run Text="Кнопка «Архивировать» перемещает все выбранные файлы в папку "/>
+                                    <Run Text="DigitalGardener_Archive" FontWeight="Bold"/>
+                                    <Run Text=" рядом с приложением. Оригиналы удаляются со старого места. Файлы НЕ сжимаются — это просто перенос. Если файл занят другой программой (например, Visual Studio держит свои логи), он будет пропущен, а остальные перенесутся."/>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
@@ -911,75 +1005,102 @@
 
                         <TextBlock Text="🗑️ Temp и Downloads" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Temp — временная папка Windows. Здесь программы хранят файлы «на минутку» (кэш установки, логи, промежуточные данные) и часто забывают их удалять. Со временем эта папка раздувается до гигабайт. Очистка Temp и Downloads безопасна: удаляются только мусорные файлы. Скачанные файлы в браузере (Downloads) приложение НЕ трогает."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Temp — временная папка Windows. Здесь программы хранят файлы «на минутку» (кэш установки, логи, промежуточные данные) и часто забывают их удалять. Со временем эта папка раздувается до гигабайт. Очистка Temp безопасна: удаляются только мусорные файлы. Скачанные файлы в браузере (Downloads) приложение НЕ трогает."/>
 
                         <TextBlock Text="🌐 Кэш браузеров" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Когда вы заходите на сайт, браузер сохраняет картинки, скрипты и стили в кэш — чтобы в следующий раз сайт открылся быстрее. Со временем кэш занимает гигабайты. Очистка не затронет ваши пароли, закладки и историю — только временные данные."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Когда вы заходите на сайт, браузер сохраняет картинки, скрипты и стили в кэш — чтобы в следующий раз сайт открылся быстрее. Со временем кэш занимает гигабайты. Очистка не затронет ваши пароли, закладки и историю — только временные данные."/>
 
                         <TextBlock Text="🎮 Игровой кэш" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Игры и видеокарты хранят shader cache — скомпилированные шейдеры для быстрой загрузки уровней. После обновления драйверов или самой игры этот кэш устаревает и занимает место. Очистка безопасна — игры создадут его заново."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Игры и видеокарты хранят shader cache — скомпилированные шейдеры для быстрой загрузки уровней. После обновления драйверов или самой игры этот кэш устаревает и занимает место. Очистка безопасна — игры создадут его заново."/>
 
                         <TextBlock Text="📁 Неиспользуемые файлы" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Приложение ищет файлы, папки и программы, которые вы не открывали дольше выбранного срока (30/60/90/180 дней). Это помогает освободить место. Перед удалением убедитесь, что файл вам действительно не нужен."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Приложение ищет файлы, папки и программы, которые вы не открывали дольше выбранного срока (30/60/90/180 дней). Это помогает освободить место. Перед удалением убедитесь, что файл вам действительно не нужен."/>
+
+                        <TextBlock Text="📦 Архивы и установщики" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Приложение ищет «забытые» архивы (.zip, .rar, .7z, .iso и т.д.) и установщики (.exe, .msi), которые не изменялись дольше выбранного срока. Их можно удалить в корзину или перенести в архив приложения. Полезно, когда после распаковки архива или установки программы исходник валяется на диске годами."/>
 
                         <TextBlock Text="🔍 Поиск дубликатов" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Приложение сравнивает файлы по хешу (уникальному «отпечатку») и находит идентичные копии. Это может освободить много места, если у вас много дубликатов фото, музыки или документов."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Приложение сравнивает файлы по хешу (уникальному «отпечатку») и находит идентичные копии. Это может освободить много места, если у вас много дубликатов фото, музыки или документов. Можно выбрать область сканирования: папки пользователя (быстро) или весь диск (долго). В любой момент можно нажать «Отмена» — процесс остановится."/>
 
                         <TextBlock Text="🚀 Автозагрузка" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Программы, которые запускаются с Windows, замедляют старт системы. Приложение показывает всё, что в автозагрузке, и позволяет отключить лишнее. Отключение не удаляет программу — вы всегда можете вернуть её обратно."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Программы, которые запускаются с Windows, замедляют старт системы. Приложение показывает всё, что в автозагрузке, и позволяет отключить лишнее. Отключение не удаляет программу — вы всегда можете вернуть её обратно."/>
 
                         <TextBlock Text="⚙️ Мониторинг процессов" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Показывает все запущенные процессы. Вы можете завершить «зависшие» или ненужные. Системные процессы (например, svchost) завершать не рекомендуется — это может нарушить работу Windows."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Показывает все запущенные процессы. Вы можете завершить «зависшие» или ненужные. Системные процессы (например, svchost) завершать не рекомендуется — это может нарушить работу Windows. Можно включить авто-обновление списка с интервалом 3/5/10/30 секунд."/>
 
                         <TextBlock Text="🗑️ Удаление программ" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Список всех установленных программ. При нажатии «Удалить» запускается штатный деинсталлятор программы — тот же, что и в Панели управления Windows."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Список всех установленных программ. При нажатии «Удалить» запускается штатный деинсталлятор программы — тот же, что и в Панели управления Windows. Если программа уже удалена с диска, а запись в реестре осталась, приложение предложит удалить и её."/>
 
                         <TextBlock Text="🔓 Заблокированные файлы" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Если файл не удаляется («занят другой программой»), приложение подскажет, какая программа держит файл, и поможет её завершить. Это самая полезная функция, если вам нужно срочно удалить занятый файл."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Если файл не удаляется («занят другой программой»), приложение подскажет, какая программа держит файл, и поможет её завершить. Это самая полезная функция, если вам нужно срочно удалить занятый файл."/>
 
                         <TextBlock Text="📊 Графики CPU/RAM" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Показывают загрузку процессора и оперативной памяти в реальном времени. Если графики не нужны — снимите галочку «Показывать»."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Показывают загрузку процессора и оперативной памяти в реальном времени. Если графики не нужны — снимите галочку «Показывать» или отключите их в Настройках."/>
 
                         <TextBlock Text="🔍 Поиск и фильтр" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Над каждой таблицей есть строка поиска и фильтр по расширению файлов. Это позволяет быстро найти нужный файл среди сотен и тысяч строк."/>
+
+                        <TextBlock Text="📋 Журнал и Отчёт" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="На вкладке «Журнал и Отчёт» сверху — журнал всех действий в текущей сессии, снизу — журнал ошибок. Журнал ошибок ведётся отдельно для каждого запуска приложения (файл вида errors_ГГГГ-ММ-ДД_ЧЧ-ММ-СС.log). Новые ошибки появляются в нижнем блоке автоматически. Кнопки «Обновить журнал ошибок» и «Открыть папку логов» позволяют посмотреть историю по предыдущим запускам. Оба журнала можно экспортировать в TXT или CSV."/>
+
+                        <TextBlock Text="💽 Выбор диска" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,10"
+                                   Text="В футере приложения (внизу окна) есть выпадающий список дисков. Он влияет на сканирование ТОЛЬКО в трёх вкладках:"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,4">
+                            <Run Text="● "/><Run Text="Неиспользуемые файлы" FontWeight="Bold"/><Run Text=" — ищет старые файлы на выбранном диске"/>
+                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,4">
+                            <Run Text="● "/><Run Text="Архивы и установщики" FontWeight="Bold"/><Run Text=" — ищет забытые архивы и установщики на выбранном диске"/>
+                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,10">
+                            <Run Text="● "/><Run Text="Поиск дубликатов" FontWeight="Bold"/><Run Text=" — но ТОЛЬКО в режиме «Весь диск». Если выбран режим «Папки пользователя», сканируются стандартные папки на диске C: (Документы, Изображения, Видео, Загрузки, Рабочий стол)."/>
+                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,10">
+                            <Run Text="Остальные вкладки (Temp, Кэш браузеров, Игровой кэш, Автозагрузка, Процессы, Удаление программ, Заблокированные файлы, ОС и характеристики) "/>
+                            <Run Text="НЕ зависят от выбора диска" FontWeight="Bold"/>
+                            <Run Text=", потому что работают либо с системными папками (Temp, кэш браузеров всегда на C:), либо вообще не с файлами (реестр, процессы)."/>
+                        </TextBlock>
                         <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Над каждой таблицей есть строка поиска и фильтр по расширению файлов. Это позволяет быстро найти нужный файл среди сотен и тысяч строк."/>
+                            <Run Text="Рядом с выпадающим списком показывается "/>
+                            <Run Text="свободное место" FontWeight="Bold"/>
+                            <Run Text=" на выбранном диске (например: «C: — свободно 27,10 ГБ из 199,49 ГБ»)."/>
                         </TextBlock>
 
                         <TextBlock Text="⚙️ Настройки" FontSize="16" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
-                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18">
-                            <Run Text="Кнопка «Настройки» в шапке — позволяет изменить: дни для поиска неиспользуемых файлов, авто-обновление процессов, интервал, показывать ли скрытые файлы, сворачивать ли в трей, закрывать ли в трей."/>
-                        </TextBlock>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Кнопка «Настройки» в шапке — позволяет изменить: дни для поиска неиспользуемых файлов, авто-обновление процессов, интервал, показывать ли графики CPU/RAM, сворачивать ли в трей, закрывать ли в трей."/>
+
+                        <TextBlock Text="🛡️ Права администратора" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource ThemeMainText}" Margin="0,0,0,6"/>
+                        <TextBlock Foreground="{StaticResource ThemeSubText}" TextWrapping="Wrap" Margin="0,0,0,18"
+                                   Text="Приложение требует права администратора при запуске (UAC). Без них некоторые функции будут недоступны: отключение автозагрузки HKLM, завершение системных процессов, удаление системных файлов. Если приложение запущено без прав — в шапке появится красная плашка с кнопкой «Перезапустить от админа»."/>
 
                         <Border Background="{StaticResource ThemePanelBg}"
                                 BorderBrush="{StaticResource ThemeBorder}"
@@ -991,9 +1112,8 @@
                                            Foreground="{StaticResource ThemeMainText}"
                                            Margin="0,0,0,10"/>
                                 <TextBlock Foreground="{StaticResource ThemeSubText}"
-                                           TextWrapping="Wrap" Margin="0,0,0,12">
-                                    <Run Text="Нашли баг? Есть идея? Хотите предложить функцию? Пишите в Telegram:"/>
-                                </TextBlock>
+                                           TextWrapping="Wrap" Margin="0,0,0,12"
+                                           Text="Нашли баг? Есть идея? Хотите предложить функцию? Пишите в Telegram:"/>
                                 <Button Content="✈️ @Boleznen — написать разработчику"
                                         Click="OpenTelegram_Click"
                                         HorizontalAlignment="Left"
@@ -1002,7 +1122,7 @@
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="© 2026 Digital Gardener v1.2.0"
+                        <TextBlock Text="© 2026 Digital Gardener v1.3.0"
                                    Foreground="{StaticResource ThemeSubText}"
                                    HorizontalAlignment="Center"
                                    Margin="0,30,0,10"/>
@@ -1010,50 +1130,96 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ==================== ЖУРНАЛ ==================== -->
+            <!-- ЖУРНАЛ И ОТЧЁТ -->
             <TabItem Header="Журнал и Отчёт">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="200"/>
                     </Grid.RowDefinitions>
-                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
-                        <Button Content="Обновить журнал ошибок" Click="RefreshLog_Click" Margin="0,0,10,0"/>
-                        <Button Content="Очистить отчёт" Click="ClearReport_Click" Margin="0,0,10,0"/>
+
+                    <WrapPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="📋 Журнал действий:"
+                                   Foreground="{StaticResource ThemeMainText}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,16,0"/>
                         <Button Content="Экспорт в TXT" Click="ExportTxt_Click" Margin="0,0,10,0"/>
                         <Button Content="Экспорт в CSV" Click="ExportCsv_Click" Margin="0,0,10,0"/>
                         <Button Content="Открыть папку отчётов" Click="OpenReportsFolder_Click" Margin="0,0,10,0"/>
-                        <Button Content="Удалить все отчёты" Click="DeleteAllReports_Click"/>
+                        <Button Content="Очистить журнал" Click="ClearReport_Click" Margin="0,0,10,0"/>
+                        <Button Content="Удалить файлы отчётов" Click="DeleteAllReports_Click"/>
                     </WrapPanel>
-                    <ListBox Grid.Row="1" ItemsSource="{Binding ReportItems}"
+
+                    <ListBox Grid.Row="1"
+                             x:Name="ReportListBox"
+                             ItemsSource="{Binding ReportItems}"
                              Background="{StaticResource ThemeItemBg}"
                              Foreground="{StaticResource ThemeMainText}"
                              BorderBrush="{StaticResource ThemeBorder}"
-                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.CanContentScroll="True"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="[" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding Timestamp}" Foreground="{StaticResource ThemeSubText}"/>
+                                    <TextBlock Text="] [" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
                                     <TextBlock Text="{Binding Category}" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
-                                    <TextBlock Text="]" Foreground="{StaticResource ThemeAccent}" FontWeight="Bold" Margin="0,0,6,0"/>
+                                    <TextBlock Text="] " Foreground="{StaticResource ThemeAccent}" FontWeight="Bold"/>
                                     <TextBlock Text="{Binding Message}" Foreground="{StaticResource ThemeMainText}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                    <TextBox Grid.Row="2" x:Name="LogTextBox" Height="130" Margin="0,12,0,0"
-                             AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True"
-                             VerticalScrollBarVisibility="Auto"/>
+
+                    <Border Grid.Row="2"
+                            BorderBrush="{StaticResource ThemeBorder}"
+                            BorderThickness="0,1,0,0"
+                            Margin="0,10,0,0"
+                            Padding="0,8,0,0">
+                        <WrapPanel Orientation="Horizontal">
+                            <TextBlock Text="⚠️ Журнал ошибок:"
+                                       Foreground="{StaticResource ThemeWarning}"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,16,0"/>
+                            <Button Content="Обновить журнал ошибок" Click="RefreshLog_Click" Margin="0,0,10,0"/>
+                            <Button Content="Очистить журнал ошибок" Click="ClearLog_Click" Margin="0,0,10,0"/>
+                            <Button Content="Открыть папку логов" Click="OpenLogsFolder_Click" Margin="0,0,10,0"/>
+                            <Button Content="Экспорт лога в TXT" Click="ExportLogTxt_Click" Margin="0,0,10,0"/>
+                            <Button Content="Экспорт лога в CSV" Click="ExportLogCsv_Click"/>
+                        </WrapPanel>
+                    </Border>
+
+                    <TextBox Grid.Row="3"
+                             x:Name="LogTextBox"
+                             IsReadOnly="True"
+                             AcceptsReturn="True"
+                             TextWrapping="NoWrap"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             Background="{StaticResource ThemeItemBg}"
+                             Foreground="{StaticResource ThemeMainText}"
+                             BorderBrush="{StaticResource ThemeBorder}"
+                             BorderThickness="1"
+                             Padding="8,6"/>
                 </Grid>
             </TabItem>
         </TabControl>
 
-        <!-- ========== ФУТЕР ========== -->
+        <!-- ФУТЕР -->
         <Border Grid.Row="3" Background="{StaticResource ThemePanelBg}"
                 Padding="12" BorderBrush="{StaticResource ThemeBorder}" BorderThickness="0,1,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -1086,18 +1252,88 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <TextBlock Grid.Column="1" x:Name="DiskSpaceText"
-                           Text=""
-                           Foreground="{StaticResource ThemeSubText}"
-                           VerticalAlignment="Center"
-                           HorizontalAlignment="Center"
-                           FontWeight="SemiBold"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <TextBlock Text="💽 Диск:"
+                               Foreground="{StaticResource ThemeSubText}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               FontWeight="SemiBold"/>
+                    <ComboBox x:Name="DriveCombo"
+                              Width="280"
+                              SelectionChanged="DriveCombo_SelectionChanged"/>
+                </StackPanel>
 
-                <TextBlock Grid.Column="2"
-                           Text="Digital Gardener v1.2.0"
+                <TextBlock Grid.Column="3"
+                           Text="Digital Gardener v1.3.0"
                            Foreground="{StaticResource ThemeSubText}"
                            VerticalAlignment="Center"/>
             </Grid>
+        </Border>
+
+        <!-- ОВЕРЛЕЙ -->
+        <Border x:Name="BusyOverlay"
+                Grid.Row="0" Grid.RowSpan="4"
+                Background="#CC000000"
+                Visibility="Collapsed"
+                Panel.ZIndex="999">
+            <Border Background="{StaticResource ThemePanelBg}"
+                    BorderBrush="{StaticResource ThemeAccent}"
+                    BorderThickness="2"
+                    CornerRadius="12"
+                    Padding="40,32"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="620">
+                <StackPanel>
+                    <TextBlock Text="⏳"
+                               FontSize="42"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,12"/>
+                    <TextBlock x:Name="BusyTitle"
+                               Text="Подождите, идёт процесс..."
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource ThemeMainText}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="0,0,0,6"/>
+                    <TextBlock x:Name="BusySubtitle"
+                               Text="Не закрывайте программу"
+                               FontSize="13"
+                               Foreground="{StaticResource ThemeSubText}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="0,0,0,20"/>
+                    <ProgressBar x:Name="BusyProgressBar"
+                                 Height="8"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Value="0"
+                                 Foreground="{StaticResource ThemeGreen}"
+                                 Background="{StaticResource ThemeWindowBg}"
+                                 BorderThickness="0"
+                                 Margin="0,0,0,10"/>
+                    <TextBlock x:Name="BusyCounter"
+                               Text=""
+                               FontSize="12"
+                               Foreground="{StaticResource ThemeSubText}"
+                               HorizontalAlignment="Center"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Width="540"
+                               Margin="0,0,0,16"/>
+
+                    <Button x:Name="BusyCancelButton"
+                            Content="Отмена"
+                            Click="BusyCancel_Click"
+                            Visibility="Collapsed"
+                            HorizontalAlignment="Center"
+                            Padding="24,8"
+                            MinWidth="140"/>
+                </StackPanel>
+            </Border>
         </Border>
     </Grid>
 </Window>

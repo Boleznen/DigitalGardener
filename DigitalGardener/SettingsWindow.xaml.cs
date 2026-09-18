@@ -42,10 +42,7 @@ namespace DigitalGardener
             if (AutoRefreshIntervalComboSettings != null)
                 AutoRefreshIntervalComboSettings.SelectedIndex = intervalIdx;
 
-            // Отображение
-            if (ShowHiddenFilesCheck != null)
-                ShowHiddenFilesCheck.IsChecked = _settings.ShowHiddenFiles;
-
+            // Графики CPU/RAM
             if (ShowMonitorCheckSettings != null)
                 ShowMonitorCheckSettings.IsChecked = _settings.ShowSystemMonitor;
 
@@ -74,7 +71,6 @@ namespace DigitalGardener
                 _settings.AutoRefreshIntervalSec = sec;
             }
 
-            _settings.ShowHiddenFiles = ShowHiddenFilesCheck?.IsChecked == true;
             _settings.ShowSystemMonitor = ShowMonitorCheckSettings?.IsChecked == true;
             _settings.MinimizeToTray = MinimizeToTrayCheck?.IsChecked == true;
             _settings.CloseToTray = CloseToTrayCheck?.IsChecked == true;

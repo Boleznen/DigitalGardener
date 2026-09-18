@@ -216,9 +216,6 @@
                                    FontSize="14" FontWeight="Bold"
                                    Foreground="{StaticResource ThemeAccent}"
                                    Margin="0,0,0,10"/>
-                        <CheckBox x:Name="ShowHiddenFilesCheck"
-                                  Content="Показывать скрытые файлы"
-                                  Margin="0,0,0,8"/>
                         <CheckBox x:Name="ShowMonitorCheckSettings"
                                   Content="Показывать графики CPU/RAM на вкладке «ОС и характеристики»"/>
                     </StackPanel>

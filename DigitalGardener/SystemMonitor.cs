@@ -80,5 +80,17 @@ namespace DigitalGardener
             }
             catch { return 0; }
         }
+
+        /// <summary>Освобождает PerformanceCounter. Вызывать при закрытии приложения.</summary>
+        public static void Dispose()
+        {
+            try
+            {
+                _cpuCounter?.Dispose();
+                _cpuCounter = null;
+                _cpuInitTried = false;
+            }
+            catch { }
+        }
     }
 }

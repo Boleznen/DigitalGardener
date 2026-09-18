@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -32,14 +31,7 @@ namespace DigitalGardener
                 {
                     string json = File.ReadAllText(SettingsFile);
                     var s = JsonSerializer.Deserialize<AppSettings>(json);
-                    if (s != null)
-                    {
-                        // Миграция: если ScanRoots пустой — заполняем дефолтными
-                        if (s.ScanRoots == null || s.ScanRoots.Count == 0)
-                            s.ScanRoots = GetDefaultScanRoots();
-
-                        return s;
-                    }
+                    if (s != null) return s;
                 }
             }
             catch (Exception ex)
@@ -48,7 +40,7 @@ namespace DigitalGardener
                     nameof(Load), ex);
             }
 
-            var fresh = new AppSettings { ScanRoots = GetDefaultScanRoots() };
+            var fresh = new AppSettings();
             Save(fresh);
             return fresh;
         }
@@ -71,18 +63,5 @@ namespace DigitalGardener
         }
 
         public static void SaveCurrent() => Save(Current);
-
-        public static List<string> GetDefaultScanRoots()
-        {
-            return new List<string>
-            {
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
-                Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
-            };
-        }
     }
 }

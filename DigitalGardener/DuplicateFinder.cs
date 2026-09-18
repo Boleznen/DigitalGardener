@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DigitalGardener
 {
     public static class DuplicateFinder
     {
+        private const long MinFileSizeBytes = 1024 * 1024; // 1 МБ
+
         public static async Task<List<DuplicateItem>> FindDuplicatesAsync(
             List<string> paths,
-            IProgress<int>? progress = null)
+            IProgress<int>? progress = null,
+            CancellationToken cancellationToken = default)
         {
-            // Шаг 1: собираем файлы и группируем по размеру
             var bySize = new Dictionary<long, List<string>>();
 
             await Task.Run(() =>
@@ -23,10 +26,11 @@ namespace DigitalGardener
                     if (!Directory.Exists(path)) continue;
                     foreach (var file in SafeEnumerateFiles(path))
                     {
+                        if (cancellationToken.IsCancellationRequested) return;
                         try
                         {
                             var fi = new FileInfo(file);
-                            if (fi.Length == 0) continue;
+                            if (fi.Length < MinFileSizeBytes) continue;
                             if (!bySize.TryGetValue(fi.Length, out var list))
                             {
                                 list = new List<string>();
@@ -37,11 +41,10 @@ namespace DigitalGardener
                         catch { }
                     }
                 }
-            });
+            }, cancellationToken);
 
             progress?.Report(20);
 
-            // Шаг 2: хешируем только файлы с одинаковым размером
             var byHash = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             var candidates = bySize.Values.Where(g => g.Count > 1).SelectMany(g => g).ToList();
             int total = candidates.Count;
@@ -51,6 +54,7 @@ namespace DigitalGardener
             {
                 foreach (var file in candidates)
                 {
+                    if (cancellationToken.IsCancellationRequested) return;
                     try
                     {
                         string hash = ComputeHash(file);
@@ -68,7 +72,7 @@ namespace DigitalGardener
                     if (total > 0)
                         progress?.Report(20 + (int)(70.0 * done / total));
                 }
-            });
+            }, cancellationToken);
 
             progress?.Report(95);
 
@@ -121,6 +125,8 @@ namespace DigitalGardener
             while (stack.Count > 0)
             {
                 var dir = stack.Pop();
+                if (IsSystemFolder(dir)) continue;
+
                 string[] files = Array.Empty<string>();
                 string[] subdirs = Array.Empty<string>();
                 try { files = Directory.GetFiles(dir, "*", SearchOption.TopDirectoryOnly); } catch { }
@@ -129,6 +135,23 @@ namespace DigitalGardener
                 foreach (var f in files) yield return f;
                 foreach (var d in subdirs) stack.Push(d);
             }
+        }
+
+        private static bool IsSystemFolder(string path)
+        {
+            var p = path.ToLowerInvariant();
+            return p.Contains(@"\windows\")
+                || p.Contains(@"\program files\")
+                || p.Contains(@"\program files (x86)\")
+                || p.Contains(@"\programdata\")
+                || p.Contains(@"\$recycle.bin")
+                || p.Contains(@"\system volume information")
+                || p.Contains(@"\node_modules\")
+                || p.Contains(@"\.git\")
+                || p.Contains(@"\.vs\")
+                || p.Contains(@"\bin\debug")
+                || p.Contains(@"\bin\release")
+                || p.Contains(@"\obj\");
         }
     }
 }
